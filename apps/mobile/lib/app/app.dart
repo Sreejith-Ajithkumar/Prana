@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../features/splash/presentation/splash_screen.dart';
+
+import 'router.dart';
 
 class PranaApp extends StatelessWidget {
   const PranaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Prana',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
@@ -14,7 +15,7 @@ class PranaApp extends StatelessWidget {
         useMaterial3: true,
         colorSchemeSeed: Colors.green,
       ),
-      home: const SplashScreen(),
+      routerConfig: appRouter,
     );
   }
 }

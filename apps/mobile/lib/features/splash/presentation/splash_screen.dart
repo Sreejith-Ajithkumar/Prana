@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -33,7 +34,9 @@ class SplashScreen extends StatelessWidget {
               ),
               SizedBox(height: 48),
               FilledButton(
-                onPressed: () {},
+                onPressed: () {
+                  context.go('/dashboard');
+                },
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: 32,
