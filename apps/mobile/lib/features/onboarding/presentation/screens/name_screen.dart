@@ -4,6 +4,8 @@ import '../../../../core/theme/app_spacing.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../controllers/onboarding_scope.dart';
+
 class NameScreen extends StatefulWidget {
   const NameScreen({super.key});
 
@@ -26,12 +28,13 @@ class _NameScreenState extends State<NameScreen> {
     return;
   }
 
-  final firstName = _nameController.text.trim();
+  final controller = OnboardingScope.of(context);
 
-  context.push(
-    '/onboarding/sex',
-    extra: firstName,
+  controller.setFirstName(
+    _nameController.text.trim(),
   );
+
+  context.push('/onboarding/sex');
 }
 
   @override

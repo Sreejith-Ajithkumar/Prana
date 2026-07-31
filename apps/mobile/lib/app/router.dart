@@ -2,10 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/dashboard/presentation/dashboard_screen.dart';
+import '../features/onboarding/presentation/controllers/onboarding_controller.dart';
+import '../features/onboarding/presentation/controllers/onboarding_scope.dart';
+import '../features/onboarding/presentation/screens/date_of_birth_screen.dart';
 import '../features/onboarding/presentation/screens/name_screen.dart';
 import '../features/onboarding/presentation/screens/onboarding_intro_screen.dart';
 import '../features/onboarding/presentation/screens/sex_screen.dart';
 import '../features/splash/presentation/splash_screen.dart';
+
+final OnboardingController onboardingController = OnboardingController();
+
+Widget _withOnboardingScope(Widget child) {
+  return OnboardingScope(
+    controller: onboardingController,
+    child: child,
+  );
+}
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -18,21 +30,36 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/onboarding',
       name: 'onboarding',
-      builder: (context, state) => const OnboardingIntroScreen(),
+      builder: (context, state) {
+        return _withOnboardingScope(
+          const OnboardingIntroScreen(),
+        );
+      },
     ),
     GoRoute(
       path: '/onboarding/name',
       name: 'onboarding-name',
-      builder: (context, state) => const NameScreen(),
+      builder: (context, state) {
+        return _withOnboardingScope(
+          const NameScreen(),
+        );
+      },
     ),
     GoRoute(
       path: '/onboarding/sex',
       name: 'onboarding-sex',
       builder: (context, state) {
-        final firstName = state.extra as String? ?? '';
-
-        return SexScreen(
-          firstName: firstName,
+        return _withOnboardingScope(
+          const SexScreen(),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/onboarding/birthday',
+      name: 'onboarding-birthday',
+      builder: (context, state) {
+        return _withOnboardingScope(
+          const DateOfBirthScreen(),
         );
       },
     ),

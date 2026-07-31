@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
+import '../controllers/onboarding_scope.dart';
 
 class SexScreen extends StatelessWidget {
   const SexScreen({
-    required this.firstName,
     super.key,
   });
 
-  final String firstName;
 
   @override
   Widget build(BuildContext context) {
+    final controller = OnboardingScope.of(context);
+    final firstName = controller.state.firstName;   
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('About you'),
