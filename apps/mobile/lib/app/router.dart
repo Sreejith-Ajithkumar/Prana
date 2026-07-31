@@ -9,6 +9,9 @@ import '../features/onboarding/presentation/screens/name_screen.dart';
 import '../features/onboarding/presentation/screens/onboarding_intro_screen.dart';
 import '../features/onboarding/presentation/screens/sex_screen.dart';
 import '../features/splash/presentation/splash_screen.dart';
+import '../features/onboarding/presentation/screens/height_screen.dart';
+import '../features/onboarding/presentation/screens/weight_screen.dart';
+import '../features/onboarding/presentation/screens/goal_weight_screen.dart';
 
 final OnboardingController onboardingController = OnboardingController();
 
@@ -60,6 +63,33 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) {
         return _withOnboardingScope(
           const DateOfBirthScreen(),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/onboarding/height',
+      name: 'onboarding-height',
+      builder: (context, state) {
+        return _withOnboardingScope(
+          const HeightScreen(),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/onboarding/weight',
+      name: 'onboarding-weight',
+      builder: (context, state) {
+        return _withOnboardingScope(
+          const WeightScreen(),
+        );
+      },
+    ),
+    GoRoute(
+      path: '/onboarding/goal-weight',
+      name: 'onboarding-goal-weight',
+      builder: (context, state) {
+        return _withOnboardingScope(
+          const GoalWeightScreen(),
         );
       },
     ),
