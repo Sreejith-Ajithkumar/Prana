@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
 import 'router.dart';
 
 class PranaApp extends StatelessWidget {
@@ -10,11 +11,9 @@ class PranaApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Prana',
       debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.green,
-      ),
       routerConfig: appRouter,
     );
   }

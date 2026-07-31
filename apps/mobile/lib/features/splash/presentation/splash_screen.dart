@@ -14,10 +14,10 @@ class SplashScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.favorite,
+                Icons.eco_rounded,
                 size: 100,
                 color: Colors.green,
-              ),
+          ),
               SizedBox(height: 32),
               Text(
                 'Prana',
@@ -35,7 +35,7 @@ class SplashScreen extends StatelessWidget {
               SizedBox(height: 48),
               FilledButton(
                 onPressed: () {
-                  context.go('/dashboard');
+                  context.push('/onboarding');
                 },
                 child: Padding(
                   padding: EdgeInsets.symmetric(
