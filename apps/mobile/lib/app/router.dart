@@ -12,6 +12,9 @@ import '../features/splash/presentation/splash_screen.dart';
 import '../features/onboarding/presentation/screens/height_screen.dart';
 import '../features/onboarding/presentation/screens/weight_screen.dart';
 import '../features/onboarding/presentation/screens/goal_weight_screen.dart';
+import '../features/onboarding/presentation/screens/goal_screen.dart';
+import '../features/onboarding/presentation/screens/activity_level_screen.dart';
+import '../features/onboarding/presentation/screens/review_screen.dart';
 
 final OnboardingController onboardingController = OnboardingController();
 
@@ -93,6 +96,33 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
+    GoRoute(
+      path: '/onboarding/goal',
+      name: 'onboarding-goal',
+      builder: (context, state) {
+        return _withOnboardingScope(
+          const GoalScreen(),
+        );
+      },
+    ),
+    GoRoute(
+        path: '/onboarding/activity',
+        name: 'onboarding-activity',
+        builder: (context, state) {
+          return _withOnboardingScope(
+            const ActivityLevelScreen(),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/onboarding/review',
+        name: 'onboarding-review',
+        builder: (context, state) {
+          return _withOnboardingScope(
+            const ReviewScreen(),
+          );
+        },
+      ),
     GoRoute(
       path: '/dashboard',
       name: 'dashboard',

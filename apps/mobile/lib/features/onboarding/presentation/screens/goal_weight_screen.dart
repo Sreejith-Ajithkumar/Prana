@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../controllers/onboarding_scope.dart';
+import '../../../../core/widgets/layout/progress_header.dart';
 
 enum GoalWeightUnit {
   kilograms,
@@ -149,29 +150,12 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(
-                value: 6 / 8,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'What is your goal weight?',
-                style:
-                    Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Your goal helps us personalize your daily calorie target.',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+              const ProgressHeader(
+                  progress: 6 / 8,
+                  title: 'What is your goal weight?',
+                  subtitle:
+                      'Your goal helps us personalize your daily calorie target.',
+                ),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<GoalWeightUnit>(

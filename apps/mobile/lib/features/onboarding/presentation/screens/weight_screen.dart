@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../controllers/onboarding_scope.dart';
+import '../../../../core/widgets/buttons/prana_button.dart';
+import '../../../../core/widgets/layout/progress_header.dart';
 
 enum WeightUnit {
   kilograms,
@@ -122,23 +124,12 @@ class _WeightScreenState extends State<WeightScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(
-                value: 5 / 8,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'What is your current weight?',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'This helps us calculate your metabolism and daily energy needs.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+              const ProgressHeader(
+                      progress: 5 / 8,
+                      title: 'What is your current weight?',
+                      subtitle:
+                          'This helps us calculate your metabolism and daily energy needs.',
                     ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<WeightUnit>(
@@ -179,12 +170,9 @@ class _WeightScreenState extends State<WeightScreen> {
                 onSubmitted: (_) => _continue(),
               ),
               const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _continue,
-                  child: const Text('Next'),
-                ),
+              PranaButton(
+                text: 'Next',
+                onPressed: _continue,
               ),
             ],
           ),

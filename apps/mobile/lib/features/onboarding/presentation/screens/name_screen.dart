@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../controllers/onboarding_scope.dart';
 
+import '../../../../core/widgets/layout/progress_header.dart';
+
 class NameScreen extends StatefulWidget {
   const NameScreen({super.key});
 
@@ -51,25 +53,12 @@ class _NameScreenState extends State<NameScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                LinearProgressIndicator(
-                  value: 1 / 8,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Text(
-                  'What should we call you?',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'This will be used to personalize your dashboard.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: AppSpacing.xl),
+                const ProgressHeader(
+                    progress: 1 / 8,
+                    title: 'What should we call you?',
+                    subtitle:
+                        "Let's start by getting to know you.",
+                  ),
                 TextFormField(
                   controller: _nameController,
                   autofocus: true,

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../controllers/onboarding_scope.dart';
+import '../../../../core/widgets/buttons/prana_button.dart';
+import '../../../../core/widgets/layout/progress_header.dart';
 
 enum HeightUnit {
   metric,
@@ -153,23 +155,12 @@ class _HeightScreenState extends State<HeightScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(
-                value: 4 / 8,
-                borderRadius: BorderRadius.circular(20),
+               const ProgressHeader(
+                progress: 4 / 8,
+                title: 'How tall are you?',
+                subtitle:
+                    'We use your height to calculate your daily calorie needs.',
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'How tall are you?',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'We use your height to calculate your daily calorie needs.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<HeightUnit>(
@@ -267,9 +258,9 @@ class _HeightScreenState extends State<HeightScreen> {
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(
+                child: PranaButton(
+                  text: 'Next',
                   onPressed: _continue,
-                  child: const Text('Next'),
                 ),
               ),
             ],

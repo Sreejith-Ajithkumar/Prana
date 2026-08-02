@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../controllers/onboarding_scope.dart';
+import '../../../../core/widgets/layout/progress_header.dart';
 
 class DateOfBirthScreen extends StatefulWidget {
   const DateOfBirthScreen({
@@ -62,25 +63,12 @@ class _DateOfBirthScreenState extends State<DateOfBirthScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(
-                value: 3 / 8,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'When is your birthday?',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Your age helps us calculate your calorie needs.',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
+              const ProgressHeader(
+                  progress: 3 / 8,
+                  title: 'When is your birthday?',
+                  subtitle:
+                      'Your age helps us calculate your calorie needs.',
+                ),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(

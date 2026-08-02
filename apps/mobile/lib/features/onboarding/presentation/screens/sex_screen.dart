@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 import '../controllers/onboarding_scope.dart';
+import '../../../../core/widgets/layout/progress_header.dart';
 
 class SexScreen extends StatelessWidget {
   const SexScreen({super.key});
@@ -34,21 +35,12 @@ class SexScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              LinearProgressIndicator(
-                value: 2 / 8,
-                borderRadius: BorderRadius.circular(20),
+              ProgressHeader(
+                progress: 2 / 8,
+                title: 'Thanks, $firstName',
+                subtitle:
+                    'What is your biological sex?',
               ),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                firstName.isEmpty ? 'Tell us about you' : 'Thanks, $firstName',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'What is your biological sex?',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.xl),
               _SexOption(
                 label: 'Male',
                 onTap: () {
