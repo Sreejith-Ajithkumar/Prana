@@ -13,18 +13,11 @@ class SplashScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.eco_rounded,
-                size: 100,
-                color: Colors.green,
-          ),
+              Icon(Icons.eco_rounded, size: 100, color: Colors.green),
               SizedBox(height: 32),
               Text(
                 'Prana',
-                style: TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 16),
               Text(
@@ -38,10 +31,7 @@ class SplashScreen extends StatelessWidget {
                   context.push('/onboarding');
                 },
                 child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 12,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                   child: Text('Get Started'),
                 ),
               ),

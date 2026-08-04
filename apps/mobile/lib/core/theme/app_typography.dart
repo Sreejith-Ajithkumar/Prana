@@ -17,14 +17,8 @@ abstract final class AppTypography {
       fontWeight: FontWeight.w700,
       height: 1.2,
     ),
-    titleLarge: TextStyle(
-      fontSize: 22,
-      fontWeight: FontWeight.w700,
-    ),
-    titleMedium: TextStyle(
-      fontSize: 18,
-      fontWeight: FontWeight.w600,
-    ),
+    titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+    titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
     bodyLarge: TextStyle(
       fontSize: 17,
       fontWeight: FontWeight.w400,
@@ -35,10 +29,6 @@ abstract final class AppTypography {
       fontWeight: FontWeight.w400,
       height: 1.5,
     ),
-    labelLarge: TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.w700,
-    ),
+    labelLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
   );
 }
-

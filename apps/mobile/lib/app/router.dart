@@ -15,14 +15,12 @@ import '../features/onboarding/presentation/screens/goal_weight_screen.dart';
 import '../features/onboarding/presentation/screens/goal_screen.dart';
 import '../features/onboarding/presentation/screens/activity_level_screen.dart';
 import '../features/onboarding/presentation/screens/review_screen.dart';
+import '../features/startup/presentation/startup_screen.dart';
 
 final OnboardingController onboardingController = OnboardingController();
 
 Widget _withOnboardingScope(Widget child) {
-  return OnboardingScope(
-    controller: onboardingController,
-    child: child,
-  );
+  return OnboardingScope(controller: onboardingController, child: child);
 }
 
 final GoRouter appRouter = GoRouter(
@@ -30,6 +28,11 @@ final GoRouter appRouter = GoRouter(
   routes: [
     GoRoute(
       path: '/',
+      name: 'startup',
+      builder: (context, state) => const StartupScreen(),
+    ),
+    GoRoute(
+      path: '/welcome',
       name: 'welcome',
       builder: (context, state) => const SplashScreen(),
     ),
@@ -37,92 +40,72 @@ final GoRouter appRouter = GoRouter(
       path: '/onboarding',
       name: 'onboarding',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const OnboardingIntroScreen(),
-        );
+        return _withOnboardingScope(const OnboardingIntroScreen());
       },
     ),
     GoRoute(
       path: '/onboarding/name',
       name: 'onboarding-name',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const NameScreen(),
-        );
+        return _withOnboardingScope(const NameScreen());
       },
     ),
     GoRoute(
       path: '/onboarding/sex',
       name: 'onboarding-sex',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const SexScreen(),
-        );
+        return _withOnboardingScope(const SexScreen());
       },
     ),
     GoRoute(
       path: '/onboarding/birthday',
       name: 'onboarding-birthday',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const DateOfBirthScreen(),
-        );
+        return _withOnboardingScope(const DateOfBirthScreen());
       },
     ),
     GoRoute(
       path: '/onboarding/height',
       name: 'onboarding-height',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const HeightScreen(),
-        );
+        return _withOnboardingScope(const HeightScreen());
       },
     ),
     GoRoute(
       path: '/onboarding/weight',
       name: 'onboarding-weight',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const WeightScreen(),
-        );
+        return _withOnboardingScope(const WeightScreen());
       },
     ),
     GoRoute(
       path: '/onboarding/goal-weight',
       name: 'onboarding-goal-weight',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const GoalWeightScreen(),
-        );
+        return _withOnboardingScope(const GoalWeightScreen());
       },
     ),
     GoRoute(
       path: '/onboarding/goal',
       name: 'onboarding-goal',
       builder: (context, state) {
-        return _withOnboardingScope(
-          const GoalScreen(),
-        );
+        return _withOnboardingScope(const GoalScreen());
       },
     ),
     GoRoute(
-        path: '/onboarding/activity',
-        name: 'onboarding-activity',
-        builder: (context, state) {
-          return _withOnboardingScope(
-            const ActivityLevelScreen(),
-          );
-        },
-      ),
-      GoRoute(
-        path: '/onboarding/review',
-        name: 'onboarding-review',
-        builder: (context, state) {
-          return _withOnboardingScope(
-            const ReviewScreen(),
-          );
-        },
-      ),
+      path: '/onboarding/activity',
+      name: 'onboarding-activity',
+      builder: (context, state) {
+        return _withOnboardingScope(const ActivityLevelScreen());
+      },
+    ),
+    GoRoute(
+      path: '/onboarding/review',
+      name: 'onboarding-review',
+      builder: (context, state) {
+        return _withOnboardingScope(const ReviewScreen());
+      },
+    ),
     GoRoute(
       path: '/dashboard',
       name: 'dashboard',
@@ -138,10 +121,7 @@ final GoRouter appRouter = GoRouter(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.error_outline,
-                  size: 56,
-                ),
+                const Icon(Icons.error_outline, size: 56),
                 const SizedBox(height: 16),
                 Text(
                   'Page not found',

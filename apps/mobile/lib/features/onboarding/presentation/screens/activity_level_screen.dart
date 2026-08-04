@@ -11,8 +11,7 @@ class ActivityLevelScreen extends StatefulWidget {
   const ActivityLevelScreen({super.key});
 
   @override
-  State<ActivityLevelScreen> createState() =>
-      _ActivityLevelScreenState();
+  State<ActivityLevelScreen> createState() => _ActivityLevelScreenState();
 }
 
 class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
@@ -29,9 +28,7 @@ class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
 
     if (selectedLevel == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select your activity level.'),
-        ),
+        const SnackBar(content: Text('Please select your activity level.')),
       );
       return;
     }
@@ -44,14 +41,10 @@ class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Activity level'),
-      ),
+      appBar: AppBar(title: const Text('Activity level')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(
-            AppSpacing.screenPadding,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -73,8 +66,7 @@ class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
                     children: [
                       _ActivityOption(
                         title: 'Mostly sitting',
-                        subtitle:
-                            'Little or no planned exercise.',
+                        subtitle: 'Little or no planned exercise.',
                         icon: Icons.weekend_outlined,
                         value: ActivityLevel.sedentary,
                         selectedLevel: _selectedLevel,
@@ -83,8 +75,7 @@ class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
                       const SizedBox(height: AppSpacing.md),
                       _ActivityOption(
                         title: 'Lightly active',
-                        subtitle:
-                            'Light exercise 1–3 days per week.',
+                        subtitle: 'Light exercise 1–3 days per week.',
                         icon: Icons.directions_walk,
                         value: ActivityLevel.lightlyActive,
                         selectedLevel: _selectedLevel,
@@ -93,8 +84,7 @@ class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
                       const SizedBox(height: AppSpacing.md),
                       _ActivityOption(
                         title: 'Moderately active',
-                        subtitle:
-                            'Exercise 3–5 days per week.',
+                        subtitle: 'Exercise 3–5 days per week.',
                         icon: Icons.directions_run,
                         value: ActivityLevel.moderatelyActive,
                         selectedLevel: _selectedLevel,
@@ -103,8 +93,7 @@ class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
                       const SizedBox(height: AppSpacing.md),
                       _ActivityOption(
                         title: 'Very active',
-                        subtitle:
-                            'Hard exercise most days.',
+                        subtitle: 'Hard exercise most days.',
                         icon: Icons.fitness_center,
                         value: ActivityLevel.veryActive,
                         selectedLevel: _selectedLevel,
@@ -125,10 +114,7 @@ class _ActivityLevelScreenState extends State<ActivityLevelScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              PranaButton(
-                text: 'Next',
-                onPressed: _continue,
-              ),
+              PranaButton(text: 'Next', onPressed: _continue),
             ],
           ),
         ),
@@ -164,20 +150,14 @@ class _ActivityOption extends StatelessWidget {
       color: isSelected
           ? colorScheme.primaryContainer
           : colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(
-        AppSpacing.radiusMedium,
-      ),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
       child: InkWell(
         onTap: () => onSelected(value),
-        borderRadius: BorderRadius.circular(
-          AppSpacing.radiusMedium,
-        ),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(
-              AppSpacing.radiusMedium,
-            ),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary
@@ -187,31 +167,22 @@ class _ActivityOption extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                child: Icon(icon),
-              ),
+              CircleAvatar(child: Icon(icon)),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style:
-                          Theme.of(context).textTheme.titleMedium,
-                    ),
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       subtitle,
-                      style:
-                          Theme.of(context).textTheme.bodyMedium,
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
                 ),
               ),
-              Radio<ActivityLevel>(
-                value: value,
-              ),
+              Radio<ActivityLevel>(value: value),
             ],
           ),
         ),

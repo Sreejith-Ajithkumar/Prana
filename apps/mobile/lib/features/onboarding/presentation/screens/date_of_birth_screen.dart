@@ -6,9 +6,7 @@ import '../controllers/onboarding_scope.dart';
 import '../../../../core/widgets/layout/progress_header.dart';
 
 class DateOfBirthScreen extends StatefulWidget {
-  const DateOfBirthScreen({
-    super.key,
-  });
+  const DateOfBirthScreen({super.key});
 
   @override
   State<DateOfBirthScreen> createState() => _DateOfBirthScreenState();
@@ -37,9 +35,7 @@ class _DateOfBirthScreenState extends State<DateOfBirthScreen> {
   void _continue() {
     if (selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select your birthday.'),
-        ),
+        const SnackBar(content: Text('Please select your birthday.')),
       );
       return;
     }
@@ -54,9 +50,7 @@ class _DateOfBirthScreenState extends State<DateOfBirthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About you'),
-      ),
+      appBar: AppBar(title: const Text('About you')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
@@ -64,11 +58,10 @@ class _DateOfBirthScreenState extends State<DateOfBirthScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const ProgressHeader(
-                  progress: 3 / 8,
-                  title: 'When is your birthday?',
-                  subtitle:
-                      'Your age helps us calculate your calorie needs.',
-                ),
+                progress: 3 / 8,
+                title: 'When is your birthday?',
+                subtitle: 'Your age helps us calculate your calorie needs.',
+              ),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -82,10 +75,7 @@ class _DateOfBirthScreenState extends State<DateOfBirthScreen> {
                 ),
               ),
               const Spacer(),
-              FilledButton(
-                onPressed: _continue,
-                child: const Text('Next'),
-              ),
+              FilledButton(onPressed: _continue, child: const Text('Next')),
             ],
           ),
         ),

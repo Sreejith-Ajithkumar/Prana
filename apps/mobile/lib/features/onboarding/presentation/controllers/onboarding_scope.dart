@@ -7,13 +7,10 @@ class OnboardingScope extends InheritedNotifier<OnboardingController> {
     super.key,
     required OnboardingController controller,
     required super.child,
-  }) : super(
-          notifier: controller,
-        );
+  }) : super(notifier: controller);
 
   static OnboardingController of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<OnboardingScope>();
+    final scope = context.dependOnInheritedWidgetOfExactType<OnboardingScope>();
 
     assert(scope != null, 'No OnboardingScope found in context.');
 

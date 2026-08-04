@@ -27,9 +27,7 @@ class PranaButton extends StatelessWidget {
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 56),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(
-            PranaRadius.medium,
-          ),
+          borderRadius: BorderRadius.circular(PranaRadius.medium),
         ),
       ),
       child: AnimatedSwitcher(
@@ -39,9 +37,7 @@ class PranaButton extends StatelessWidget {
                 key: ValueKey('loading'),
                 height: 22,
                 width: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 2),
               )
             : Row(
                 key: const ValueKey('text'),
@@ -49,9 +45,7 @@ class PranaButton extends StatelessWidget {
                 children: [
                   if (icon != null) ...[
                     Icon(icon),
-                    const SizedBox(
-                      width: PranaSpacing.sm,
-                    ),
+                    const SizedBox(width: PranaSpacing.sm),
                   ],
                   Text(text),
                 ],
@@ -60,10 +54,7 @@ class PranaButton extends StatelessWidget {
     );
 
     if (expand) {
-      return SizedBox(
-        width: double.infinity,
-        child: button,
-      );
+      return SizedBox(width: double.infinity, child: button);
     }
 
     return button;

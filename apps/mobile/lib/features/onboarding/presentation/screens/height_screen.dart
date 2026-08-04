@@ -7,10 +7,7 @@ import '../controllers/onboarding_scope.dart';
 import '../../../../core/widgets/buttons/prana_button.dart';
 import '../../../../core/widgets/layout/progress_header.dart';
 
-enum HeightUnit {
-  metric,
-  imperial,
-}
+enum HeightUnit { metric, imperial }
 
 class HeightScreen extends StatefulWidget {
   const HeightScreen({super.key});
@@ -54,9 +51,7 @@ class _HeightScreenState extends State<HeightScreen> {
   }
 
   void _convertCentimetersToImperial() {
-    final centimeters = double.tryParse(
-      _centimetersController.text.trim(),
-    );
+    final centimeters = double.tryParse(_centimetersController.text.trim());
 
     if (centimeters == null) {
       return;
@@ -90,9 +85,7 @@ class _HeightScreenState extends State<HeightScreen> {
 
   double? _getHeightInCentimeters() {
     if (_selectedUnit == HeightUnit.metric) {
-      return double.tryParse(
-        _centimetersController.text.trim(),
-      );
+      return double.tryParse(_centimetersController.text.trim());
     }
 
     final feet = int.tryParse(_feetController.text.trim());
@@ -146,16 +139,14 @@ class _HeightScreenState extends State<HeightScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About you'),
-      ),
+      appBar: AppBar(title: const Text('About you')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-               const ProgressHeader(
+              const ProgressHeader(
                 progress: 4 / 8,
                 title: 'How tall are you?',
                 subtitle:
@@ -225,8 +216,7 @@ class _HeightScreenState extends State<HeightScreen> {
                     Expanded(
                       child: TextField(
                         controller: _inchesController,
-                        keyboardType:
-                            const TextInputType.numberWithOptions(
+                        keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
                         textInputAction: TextInputAction.done,
@@ -250,18 +240,15 @@ class _HeightScreenState extends State<HeightScreen> {
                   Text(
                     _errorText!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
               ],
               const Spacer(),
               SizedBox(
                 width: double.infinity,
-                child: PranaButton(
-                  text: 'Next',
-                  onPressed: _continue,
-                ),
+                child: PranaButton(text: 'Next', onPressed: _continue),
               ),
             ],
           ),

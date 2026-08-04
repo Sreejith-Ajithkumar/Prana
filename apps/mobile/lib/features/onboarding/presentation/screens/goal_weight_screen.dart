@@ -6,10 +6,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../controllers/onboarding_scope.dart';
 import '../../../../core/widgets/layout/progress_header.dart';
 
-enum GoalWeightUnit {
-  kilograms,
-  pounds,
-}
+enum GoalWeightUnit { kilograms, pounds }
 
 class GoalWeightScreen extends StatefulWidget {
   const GoalWeightScreen({super.key});
@@ -19,8 +16,7 @@ class GoalWeightScreen extends StatefulWidget {
 }
 
 class _GoalWeightScreenState extends State<GoalWeightScreen> {
-  final TextEditingController _goalWeightController =
-      TextEditingController();
+  final TextEditingController _goalWeightController = TextEditingController();
 
   GoalWeightUnit _selectedUnit = GoalWeightUnit.kilograms;
   String? _errorText;
@@ -32,12 +28,10 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
     super.didChangeDependencies();
 
     if (_goalWeightController.text.isEmpty) {
-      final currentWeightKg =
-          OnboardingScope.of(context).state.weightKg;
+      final currentWeightKg = OnboardingScope.of(context).state.weightKg;
 
       if (currentWeightKg != null) {
-        _goalWeightController.text =
-            currentWeightKg.toStringAsFixed(1);
+        _goalWeightController.text = currentWeightKg.toStringAsFixed(1);
       } else {
         _goalWeightController.text = '70';
       }
@@ -55,9 +49,7 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
       return;
     }
 
-    final value = double.tryParse(
-      _goalWeightController.text.trim(),
-    );
+    final value = double.tryParse(_goalWeightController.text.trim());
 
     setState(() {
       _errorText = null;
@@ -65,12 +57,10 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
       if (value != null) {
         if (unit == GoalWeightUnit.pounds) {
           final pounds = value / _kilogramsPerPound;
-          _goalWeightController.text =
-              pounds.toStringAsFixed(1);
+          _goalWeightController.text = pounds.toStringAsFixed(1);
         } else {
           final kilograms = value * _kilogramsPerPound;
-          _goalWeightController.text =
-              kilograms.toStringAsFixed(1);
+          _goalWeightController.text = kilograms.toStringAsFixed(1);
         }
       }
 
@@ -79,9 +69,7 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
   }
 
   double? _getGoalWeightInKilograms() {
-    final enteredWeight = double.tryParse(
-      _goalWeightController.text.trim(),
-    );
+    final enteredWeight = double.tryParse(_goalWeightController.text.trim());
 
     if (enteredWeight == null) {
       return null;
@@ -108,10 +96,9 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
 
     if (goalWeightKg < 25 || goalWeightKg > 350) {
       setState(() {
-        _errorText =
-            _selectedUnit == GoalWeightUnit.kilograms
-                ? 'Enter a weight between 25 and 350 kg.'
-                : 'Enter a weight between 55 and 772 lb.';
+        _errorText = _selectedUnit == GoalWeightUnit.kilograms
+            ? 'Enter a weight between 25 and 350 kg.'
+            : 'Enter a weight between 55 and 772 lb.';
       });
       return;
     }
@@ -133,29 +120,22 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final suffix =
-        _selectedUnit == GoalWeightUnit.kilograms
-            ? 'kg'
-            : 'lb';
+    final suffix = _selectedUnit == GoalWeightUnit.kilograms ? 'kg' : 'lb';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About you'),
-      ),
+      appBar: AppBar(title: const Text('About you')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(
-            AppSpacing.screenPadding,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const ProgressHeader(
-                  progress: 6 / 8,
-                  title: 'What is your goal weight?',
-                  subtitle:
-                      'Your goal helps us personalize your daily calorie target.',
-                ),
+                progress: 6 / 8,
+                title: 'What is your goal weight?',
+                subtitle:
+                    'Your goal helps us personalize your daily calorie target.',
+              ),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<GoalWeightUnit>(
@@ -178,8 +158,7 @@ class _GoalWeightScreenState extends State<GoalWeightScreen> {
               const SizedBox(height: AppSpacing.xl),
               TextField(
                 controller: _goalWeightController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(
+                keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
                 textInputAction: TextInputAction.done,

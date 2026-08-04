@@ -4,10 +4,65 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/widgets/buttons/prana_button.dart';
 import '../../../../core/widgets/layout/progress_header.dart';
+import '../../../profile/data/profile_storage.dart';
 import '../controllers/onboarding_scope.dart';
 
-class ReviewScreen extends StatelessWidget {
+class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
+
+  @override
+  State<ReviewScreen> createState() => _ReviewScreenState();
+}
+
+class _ReviewScreenState extends State<ReviewScreen> {
+  bool _isSaving = false;
+
+  Future<void> _finishSetup() async {
+    if (_isSaving) {
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final controller = OnboardingScope.of(context);
+      final profile = controller.buildProfile();
+
+      await ProfileStorage.instance.saveProfile(profile);
+
+      if (!mounted) {
+        return;
+      }
+
+      context.go('/dashboard');
+    } on StateError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('We could not save your profile. Please try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,21 +70,16 @@ class ReviewScreen extends StatelessWidget {
     final state = controller.state;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Review'),
-      ),
+      appBar: AppBar(title: const Text('Review')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(
-            AppSpacing.screenPadding,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: Column(
             children: [
               const ProgressHeader(
                 progress: 1,
                 title: 'Review your profile',
-                subtitle:
-                    'Please make sure everything looks correct.',
+                subtitle: 'Please make sure everything looks correct.',
               ),
               Expanded(
                 child: ListView(
@@ -42,9 +92,7 @@ class ReviewScreen extends StatelessWidget {
                     ),
                     _ReviewCard(
                       title: 'Biological sex',
-                      value: _formatEnumName(
-                        state.biologicalSex?.name,
-                      ),
+                      value: _formatEnumName(state.biologicalSex?.name),
                     ),
                     _ReviewCard(
                       title: 'Birthday',
@@ -72,15 +120,11 @@ class ReviewScreen extends StatelessWidget {
                     ),
                     _ReviewCard(
                       title: 'Health goal',
-                      value: _formatEnumName(
-                        state.goal?.name,
-                      ),
+                      value: _formatEnumName(state.goal?.name),
                     ),
                     _ReviewCard(
                       title: 'Activity level',
-                      value: _formatEnumName(
-                        state.activityLevel?.name,
-                      ),
+                      value: _formatEnumName(state.activityLevel?.name),
                     ),
                   ],
                 ),
@@ -96,9 +140,8 @@ class ReviewScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               PranaButton(
                 text: 'Finish setup',
-                onPressed: () {
-                  context.go('/dashboard');
-                },
+                isLoading: _isSaving,
+                onPressed: _finishSetup,
               ),
             ],
           ),
@@ -129,10 +172,7 @@ class ReviewScreen extends StatelessWidget {
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({
-    required this.title,
-    required this.value,
-  });
+  const _ReviewCard({required this.title, required this.value});
 
   final String title;
   final String value;
@@ -140,13 +180,8 @@ class _ReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(
-        bottom: AppSpacing.sm,
-      ),
-      child: ListTile(
-        title: Text(title),
-        subtitle: Text(value),
-      ),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: ListTile(title: Text(title), subtitle: Text(value)),
     );
   }
 }

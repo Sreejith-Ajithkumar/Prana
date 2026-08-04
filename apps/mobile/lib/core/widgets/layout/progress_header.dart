@@ -22,36 +22,23 @@ class ProgressHeader extends StatelessWidget {
       children: [
         LinearProgressIndicator(
           value: progress,
-          borderRadius: BorderRadius.circular(
-            PranaRadius.large,
-          ),
+          borderRadius: BorderRadius.circular(PranaRadius.large),
         ),
 
-        const SizedBox(
-          height: PranaSpacing.xl,
-        ),
+        const SizedBox(height: PranaSpacing.xl),
 
-        Text(
-          title,
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
+        Text(title, style: Theme.of(context).textTheme.headlineMedium),
 
-        const SizedBox(
-          height: PranaSpacing.sm,
-        ),
+        const SizedBox(height: PranaSpacing.sm),
 
         Text(
           subtitle,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
 
-        const SizedBox(
-          height: PranaSpacing.xl,
-        ),
+        const SizedBox(height: PranaSpacing.xl),
       ],
     );
   }

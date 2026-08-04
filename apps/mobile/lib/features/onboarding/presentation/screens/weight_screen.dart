@@ -7,10 +7,7 @@ import '../controllers/onboarding_scope.dart';
 import '../../../../core/widgets/buttons/prana_button.dart';
 import '../../../../core/widgets/layout/progress_header.dart';
 
-enum WeightUnit {
-  kilograms,
-  pounds,
-}
+enum WeightUnit { kilograms, pounds }
 
 class WeightScreen extends StatefulWidget {
   const WeightScreen({super.key});
@@ -38,9 +35,7 @@ class _WeightScreenState extends State<WeightScreen> {
       return;
     }
 
-    final currentValue = double.tryParse(
-      _weightController.text.trim(),
-    );
+    final currentValue = double.tryParse(_weightController.text.trim());
 
     setState(() {
       _errorText = null;
@@ -60,9 +55,7 @@ class _WeightScreenState extends State<WeightScreen> {
   }
 
   double? _getWeightInKilograms() {
-    final enteredWeight = double.tryParse(
-      _weightController.text.trim(),
-    );
+    final enteredWeight = double.tryParse(_weightController.text.trim());
 
     if (enteredWeight == null) {
       return null;
@@ -111,13 +104,10 @@ class _WeightScreenState extends State<WeightScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final suffix =
-        _selectedUnit == WeightUnit.kilograms ? 'kg' : 'lb';
+    final suffix = _selectedUnit == WeightUnit.kilograms ? 'kg' : 'lb';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About you'),
-      ),
+      appBar: AppBar(title: const Text('About you')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
@@ -125,11 +115,11 @@ class _WeightScreenState extends State<WeightScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const ProgressHeader(
-                      progress: 5 / 8,
-                      title: 'What is your current weight?',
-                      subtitle:
-                          'This helps us calculate your metabolism and daily energy needs.',
-                    ),
+                progress: 5 / 8,
+                title: 'What is your current weight?',
+                subtitle:
+                    'This helps us calculate your metabolism and daily energy needs.',
+              ),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<WeightUnit>(
@@ -170,10 +160,7 @@ class _WeightScreenState extends State<WeightScreen> {
                 onSubmitted: (_) => _continue(),
               ),
               const Spacer(),
-              PranaButton(
-                text: 'Next',
-                onPressed: _continue,
-              ),
+              PranaButton(text: 'Next', onPressed: _continue),
             ],
           ),
         ),

@@ -44,10 +44,8 @@ class OnboardingIntroScreen extends StatelessWidget {
                 'We’ll ask a few questions to create calorie, nutrition, '
                 'hydration, and activity targets that match your body and goals.',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
               const _PrivacyRow(
@@ -75,10 +73,7 @@ class OnboardingIntroScreen extends StatelessWidget {
 }
 
 class _PrivacyRow extends StatelessWidget {
-  const _PrivacyRow({
-    required this.icon,
-    required this.text,
-  });
+  const _PrivacyRow({required this.icon, required this.text});
 
   final IconData icon;
   final String text;
@@ -87,16 +82,10 @@ class _PrivacyRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+        Icon(icon, color: Theme.of(context).colorScheme.primary),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
         ),
       ],
     );

@@ -23,33 +23,27 @@ class _GoalScreenState extends State<GoalScreen> {
   }
 
   void _continue() {
-  final selectedGoal = _selectedGoal;
+    final selectedGoal = _selectedGoal;
 
-  if (selectedGoal == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please select your health goal.'),
-      ),
-    );
-    return;
+    if (selectedGoal == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select your health goal.')),
+      );
+      return;
+    }
+
+    OnboardingScope.of(context).setGoal(selectedGoal);
+
+    context.push('/onboarding/activity');
   }
-
-  OnboardingScope.of(context).setGoal(selectedGoal);
-
-  context.push('/onboarding/activity');
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Your goal'),
-      ),
+      appBar: AppBar(title: const Text('Your goal')),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(
-            AppSpacing.screenPadding,
-          ),
+          padding: const EdgeInsets.all(AppSpacing.screenPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -80,7 +74,8 @@ class _GoalScreenState extends State<GoalScreen> {
                       const SizedBox(height: AppSpacing.md),
                       _GoalOption(
                         title: 'Maintain weight',
-                        subtitle: 'Balance your calories and current lifestyle.',
+                        subtitle:
+                            'Balance your calories and current lifestyle.',
                         icon: Icons.balance,
                         value: HealthGoal.maintainWeight,
                         selectedGoal: _selectedGoal,
@@ -153,20 +148,14 @@ class _GoalOption extends StatelessWidget {
       color: isSelected
           ? colorScheme.primaryContainer
           : colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(
-        AppSpacing.radiusMedium,
-      ),
+      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
       child: InkWell(
         onTap: () => onSelected(value),
-        borderRadius: BorderRadius.circular(
-          AppSpacing.radiusMedium,
-        ),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
         child: Container(
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(
-              AppSpacing.radiusMedium,
-            ),
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary
@@ -190,24 +179,16 @@ class _GoalOption extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style:
-                          Theme.of(context).textTheme.titleMedium,
-                    ),
+                    Text(title, style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       subtitle,
-                      style:
-                          Theme.of(context).textTheme.bodyMedium,
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
                 ),
               ),
-              Radio<HealthGoal>(
-                value: value,
-               
-              ),
+              Radio<HealthGoal>(value: value),
             ],
           ),
         ),

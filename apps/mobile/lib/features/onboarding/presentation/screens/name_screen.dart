@@ -26,25 +26,21 @@ class _NameScreenState extends State<NameScreen> {
   }
 
   void _continue() {
-  if (!_formKey.currentState!.validate()) {
-    return;
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final controller = OnboardingScope.of(context);
+
+    controller.setFirstName(_nameController.text.trim());
+
+    context.push('/onboarding/sex');
   }
-
-  final controller = OnboardingScope.of(context);
-
-  controller.setFirstName(
-    _nameController.text.trim(),
-  );
-
-  context.push('/onboarding/sex');
-}
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About you'),
-      ),
+      appBar: AppBar(title: const Text('About you')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
@@ -54,11 +50,10 @@ class _NameScreenState extends State<NameScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const ProgressHeader(
-                    progress: 1 / 8,
-                    title: 'What should we call you?',
-                    subtitle:
-                        "Let's start by getting to know you.",
-                  ),
+                  progress: 1 / 8,
+                  title: 'What should we call you?',
+                  subtitle: "Let's start by getting to know you.",
+                ),
                 TextFormField(
                   controller: _nameController,
                   autofocus: true,
@@ -84,10 +79,7 @@ class _NameScreenState extends State<NameScreen> {
                   onFieldSubmitted: (_) => _continue(),
                 ),
                 const Spacer(),
-                FilledButton(
-                  onPressed: _continue,
-                  child: const Text('Next'),
-                ),
+                FilledButton(onPressed: _continue, child: const Text('Next')),
               ],
             ),
           ),

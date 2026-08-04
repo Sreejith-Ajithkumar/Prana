@@ -1,28 +1,77 @@
 import 'package:flutter/material.dart';
 
-class DashboardScreen extends StatelessWidget {
+import '../../profile/data/profile_storage.dart';
+
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  String? _firstName;
+  bool _isLoadingProfile = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final profile = await ProfileStorage.instance.loadProfile();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _firstName = profile?.firstName;
+      _isLoadingProfile = false;
+    });
+  }
+
+  String _buildGreeting() {
+    final hour = DateTime.now().hour;
+
+    final greeting = switch (hour) {
+      < 12 => 'Good morning',
+      < 17 => 'Good afternoon',
+      _ => 'Good evening',
+    };
+
+    final firstName = _firstName?.trim();
+
+    if (firstName == null || firstName.isEmpty) {
+      return greeting;
+    }
+
+    return '$greeting, $firstName 👋';
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Prana'),
-      ),
+      appBar: AppBar(title: const Text('Prana')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
-            Text(
-              'Good morning',
-              style: Theme.of(context).textTheme.titleMedium,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: Text(
+                _isLoadingProfile ? 'Welcome to Prana' : _buildGreeting(),
+                key: ValueKey(_isLoadingProfile),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               'Your health summary',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
             const _SummaryCard(
@@ -54,9 +103,9 @@ class DashboardScreen extends StatelessWidget {
             const SizedBox(height: 24),
             Text(
               'Today',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             const _EmptyState(),
@@ -97,10 +146,7 @@ class _SummaryCard extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundColor: colors.primaryContainer,
-              child: Icon(
-                icon,
-                color: colors.onPrimaryContainer,
-              ),
+              child: Icon(icon, color: colors.onPrimaryContainer),
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -112,8 +158,8 @@ class _SummaryCard extends StatelessWidget {
                   Text(
                     value,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(subtitle),
                 ],
@@ -151,9 +197,9 @@ class _MetricCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
           ],
         ),

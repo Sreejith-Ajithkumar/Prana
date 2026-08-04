@@ -9,10 +9,7 @@ import '../../../../core/widgets/layout/progress_header.dart';
 class SexScreen extends StatelessWidget {
   const SexScreen({super.key});
 
-  void _selectSex(
-    BuildContext context,
-    BiologicalSex biologicalSex,
-  ) {
+  void _selectSex(BuildContext context, BiologicalSex biologicalSex) {
     final controller = OnboardingScope.of(context);
 
     controller.setBiologicalSex(biologicalSex);
@@ -26,9 +23,7 @@ class SexScreen extends StatelessWidget {
     final firstName = controller.state.firstName;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('About you'),
-      ),
+      appBar: AppBar(title: const Text('About you')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.screenPadding),
@@ -38,34 +33,24 @@ class SexScreen extends StatelessWidget {
               ProgressHeader(
                 progress: 2 / 8,
                 title: 'Thanks, $firstName',
-                subtitle:
-                    'What is your biological sex?',
+                subtitle: 'What is your biological sex?',
               ),
               _SexOption(
                 label: 'Male',
                 onTap: () {
-                  _selectSex(
-                    context,
-                    BiologicalSex.male,
-                  );
+                  _selectSex(context, BiologicalSex.male);
                 },
               ),
               _SexOption(
                 label: 'Female',
                 onTap: () {
-                  _selectSex(
-                    context,
-                    BiologicalSex.female,
-                  );
+                  _selectSex(context, BiologicalSex.female);
                 },
               ),
               _SexOption(
                 label: 'Prefer not to say',
                 onTap: () {
-                  _selectSex(
-                    context,
-                    BiologicalSex.unspecified,
-                  );
+                  _selectSex(context, BiologicalSex.unspecified);
                 },
               ),
               const Spacer(),
@@ -87,10 +72,7 @@ class SexScreen extends StatelessWidget {
 }
 
 class _SexOption extends StatelessWidget {
-  const _SexOption({
-    required this.label,
-    required this.onTap,
-  });
+  const _SexOption({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
@@ -116,10 +98,7 @@ class _SexOption extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+            child: Text(label, style: Theme.of(context).textTheme.titleMedium),
           ),
         ),
       ),
