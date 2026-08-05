@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../nutrition/domain/models/nutrition_targets.dart';
+import '../../nutrition/domain/services/nutrition_service.dart';
 import '../../profile/data/profile_storage.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -11,25 +13,57 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   String? _firstName;
-  bool _isLoadingProfile = true;
+  NutritionTargets? _targets;
+
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadDashboard();
   }
 
-  Future<void> _loadProfile() async {
-    final profile = await ProfileStorage.instance.loadProfile();
+  Future<void> _loadDashboard() async {
+    try {
+      final profile = await ProfileStorage.instance.loadProfile();
 
-    if (!mounted) {
-      return;
+      if (profile == null) {
+        throw StateError('No saved user profile was found.');
+      }
+
+      final targets = const NutritionService().calculate(profile);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _firstName = profile.firstName;
+        _targets = targets;
+        _isLoading = false;
+      });
+    } on UnsupportedError {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage =
+            'A male or female calculation basis is currently required '
+            'to estimate nutrition targets.';
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _errorMessage = 'We could not calculate your nutrition targets.';
+        _isLoading = false;
+      });
     }
-
-    setState(() {
-      _firstName = profile?.firstName;
-      _isLoadingProfile = false;
-    });
   }
 
   String _buildGreeting() {
@@ -50,73 +84,136 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '$greeting, $firstName 👋';
   }
 
+  String _formatCategory(String value) {
+    final formatted = value.replaceAllMapped(
+      RegExp(r'([a-z])([A-Z])'),
+      (match) => '${match.group(1)} ${match.group(2)}',
+    );
+
+    return formatted[0].toUpperCase() + formatted.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Prana')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
+      body: SafeArea(child: _buildBody(context)),
+      floatingActionButton: _targets == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () {
+                // Meal logging will be implemented in Sprint 5.
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add meal'),
+            ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return _DashboardError(message: _errorMessage!, onRetry: _loadDashboard);
+    }
+
+    final targets = _targets;
+
+    if (targets == null) {
+      return _DashboardError(
+        message: 'Nutrition targets are unavailable.',
+        onRetry: _loadDashboard,
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text(_buildGreeting(), style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Text(
+          'Your health summary',
+          style: Theme.of(
+            context,
+          ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 24),
+
+        _SummaryCard(
+          title: 'Calories',
+          value: '0',
+          subtitle: 'of ${targets.calories.round()} kcal',
+          icon: Icons.local_fire_department_outlined,
+        ),
+
+        const SizedBox(height: 16),
+
+        Row(
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: Text(
-                _isLoadingProfile ? 'Welcome to Prana' : _buildGreeting(),
-                key: ValueKey(_isLoadingProfile),
-                style: Theme.of(context).textTheme.titleMedium,
+            Expanded(
+              child: _MetricCard(
+                title: 'Protein',
+                value: '0 / ${targets.protein.round()} g',
+                icon: Icons.fitness_center,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Your health summary',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _MetricCard(
+                title: 'Water',
+                value: '0 / ${targets.waterLitres.toStringAsFixed(1)} L',
+                icon: Icons.water_drop_outlined,
+              ),
             ),
-            const SizedBox(height: 24),
-            const _SummaryCard(
-              title: 'Calories',
-              value: '0',
-              subtitle: 'of 2,000 kcal',
-              icon: Icons.local_fire_department_outlined,
-            ),
-            const SizedBox(height: 16),
-            const Row(
-              children: [
-                Expanded(
-                  child: _MetricCard(
-                    title: 'Protein',
-                    value: '0 g',
-                    icon: Icons.fitness_center,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: _MetricCard(
-                    title: 'Water',
-                    value: '0 L',
-                    icon: Icons.water_drop_outlined,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Today',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            const _EmptyState(),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        icon: const Icon(Icons.add),
-        label: const Text('Add meal'),
-      ),
+
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: _MetricCard(
+                title: 'Carbs',
+                value: '0 / ${targets.carbohydrates.round()} g',
+                icon: Icons.rice_bowl_outlined,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _MetricCard(
+                title: 'Fat',
+                value: '0 / ${targets.fat.round()} g',
+                icon: Icons.eco_outlined,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        _SummaryCard(
+          title: 'BMI',
+          value: targets.bmi.toStringAsFixed(1),
+          subtitle: _formatCategory(targets.bmiCategory.name),
+          icon: Icons.monitor_weight_outlined,
+        ),
+
+        const SizedBox(height: 24),
+
+        Text(
+          'Today',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+
+        const SizedBox(height: 12),
+
+        const _EmptyState(),
+      ],
     );
   }
 }
@@ -233,6 +330,32 @@ class _EmptyState extends StatelessWidget {
               'Add your first meal to start tracking calories and nutrition.',
               textAlign: TextAlign.center,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardError extends StatelessWidget {
+  const _DashboardError({required this.message, required this.onRetry});
+
+  final String message;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48),
+            const SizedBox(height: 16),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            FilledButton(onPressed: onRetry, child: const Text('Try again')),
           ],
         ),
       ),
