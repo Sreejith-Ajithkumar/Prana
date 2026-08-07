@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../../profile/domain/entities/user_profile.dart';
 import 'onboarding_state.dart';
 
-
 class OnboardingController extends ChangeNotifier {
   OnboardingState _state = const OnboardingState();
 

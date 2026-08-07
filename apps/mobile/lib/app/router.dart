@@ -17,6 +17,9 @@ import '../features/onboarding/presentation/screens/activity_level_screen.dart';
 import '../features/onboarding/presentation/screens/review_screen.dart';
 import '../features/startup/presentation/startup_screen.dart';
 
+import '../features/meal_tracking/presentation/screens/add_meal_screen.dart';
+import '../../features/meal_tracking/presentation/screens/food_search_screen.dart';
+
 final OnboardingController onboardingController = OnboardingController();
 
 Widget _withOnboardingScope(Widget child) {
@@ -110,6 +113,18 @@ final GoRouter appRouter = GoRouter(
       path: '/dashboard',
       name: 'dashboard',
       builder: (context, state) => const DashboardScreen(),
+    ),
+
+    GoRoute(
+      path: '/meals/add',
+      name: 'add-meal',
+      builder: (context, state) => const AddMealScreen(),
+    ),
+
+    GoRoute(
+      path: '/foods/search',
+      name: 'food-search',
+      builder: (context, state) => const FoodSearchScreen(),
     ),
   ],
   errorBuilder: (context, state) {
