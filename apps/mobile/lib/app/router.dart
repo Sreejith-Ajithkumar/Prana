@@ -19,6 +19,8 @@ import '../features/startup/presentation/startup_screen.dart';
 
 import '../features/meal_tracking/presentation/screens/add_meal_screen.dart';
 import '../../features/meal_tracking/presentation/screens/food_search_screen.dart';
+import '../features/meal_tracking/domain/entities/meal_entry.dart';
+import '../features/meal_tracking/presentation/screens/edit_meal_screen.dart';
 
 final OnboardingController onboardingController = OnboardingController();
 
@@ -125,6 +127,16 @@ final GoRouter appRouter = GoRouter(
       path: '/foods/search',
       name: 'food-search',
       builder: (context, state) => const FoodSearchScreen(),
+    ),
+
+    GoRoute(
+      path: '/meals/edit',
+      name: 'edit-meal',
+      builder: (context, state) {
+        final meal = state.extra! as MealEntry;
+
+        return EditMealScreen(meal: meal);
+      },
     ),
   ],
   errorBuilder: (context, state) {

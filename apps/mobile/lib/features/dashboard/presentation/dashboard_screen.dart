@@ -30,9 +30,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDashboard() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     final profile = await ProfileStorage.instance.loadProfile();
 
@@ -85,6 +87,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '$greeting, $firstName 👋';
   }
 
+  Future<void> _openEditMeal(MealEntry meal) async {
+    final changed = await context.push<bool>('/meals/edit', extra: meal);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (changed == true) {
+      await _loadDashboard();
+    }
+  }
+
+  Future<void> _openAddMeal() async {
+    final added = await context.push<bool>('/meals/add');
+
+    if (!mounted) {
+      return;
+    }
+
+    if (added == true) {
+      await _loadDashboard();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -95,7 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             : RefreshIndicator(
                 onRefresh: _loadDashboard,
                 child: ListView(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
                   children: [
                     Text(
                       _buildGreeting(),
@@ -155,11 +181,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      'Today',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Today',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (_todayMeals.isNotEmpty)
+                          Text(
+                            '${_todayMeals.length} '
+                            '${_todayMeals.length == 1 ? 'meal' : 'meals'}',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     if (_todayMeals.isEmpty)
@@ -168,7 +210,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ..._todayMeals.map(
                         (meal) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _MealCard(meal: meal),
+                          child: _MealCard(
+                            meal: meal,
+                            onTap: () => _openEditMeal(meal),
+                          ),
                         ),
                       ),
                   ],
@@ -176,17 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final added = await context.push<bool>('/meals/add');
-
-          if (!mounted) {
-            return;
-          }
-
-          if (added == true) {
-            await _loadDashboard();
-          }
-        },
+        onPressed: _openAddMeal,
         icon: const Icon(Icons.add),
         label: const Text('Add meal'),
       ),
@@ -282,27 +317,63 @@ class _MetricCard extends StatelessWidget {
 }
 
 class _MealCard extends StatelessWidget {
-  const _MealCard({required this.meal});
+  const _MealCard({required this.meal, required this.onTap});
 
   final MealEntry meal;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
+        onTap: onTap,
         leading: CircleAvatar(child: Icon(_mealIcon(meal.type.name))),
         title: Text(_formatMealType(meal.type.name)),
-        subtitle: Text(
-          meal.foods.map((food) => food.name).join(', '),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              meal.foods.map((food) => food.name).join(', '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _buildMacroSummary(meal),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
-        trailing: Text(
-          '${meal.calories.toStringAsFixed(0)} kcal',
-          style: Theme.of(context).textTheme.titleSmall,
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${meal.calories.toStringAsFixed(0)} kcal',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            const Icon(Icons.chevron_right, size: 20),
+          ],
         ),
       ),
     );
+  }
+
+  static String _buildMacroSummary(MealEntry meal) {
+    final protein = meal.proteinGrams.toStringAsFixed(0);
+
+    final carbs = meal.carbohydrateGrams.toStringAsFixed(0);
+
+    final fat = meal.fatGrams.toStringAsFixed(0);
+
+    return 'P $protein g • C $carbs g • F $fat g';
   }
 
   static String _formatMealType(String value) {
