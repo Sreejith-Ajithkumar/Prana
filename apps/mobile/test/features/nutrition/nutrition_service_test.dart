@@ -80,6 +80,40 @@ void main() {
       expect(targets.waterLitres, closeTo(1.98, 0.001));
     });
 
+    test(
+      'avoids aggressive calorie target for lower-TDEE sedentary female',
+      () {
+        final now = DateTime.now();
+
+        final profile = UserProfile(
+          firstName: 'Test User',
+          dateOfBirth: DateTime(now.year - 32, now.month, now.day),
+          biologicalSex: BiologicalSex.female,
+          heightCm: 150,
+          weightKg: 65,
+          goalWeightKg: 60,
+          activityLevel: ActivityLevel.sedentary,
+          goal: HealthGoal.loseWeight,
+        );
+
+        final targets = service.calculate(profile);
+
+        expect(targets.bmr, closeTo(1266.5, 0.01));
+
+        expect(targets.tdee, closeTo(1519.8, 0.01));
+
+        expect(targets.calories, closeTo(1215.84, 0.01));
+
+        expect(targets.protein, closeTo(130, 0.01));
+
+        expect(targets.fat, closeTo(40.528, 0.01));
+
+        expect(targets.carbohydrates, closeTo(82.772, 0.01));
+
+        expect(targets.waterLitres, closeTo(2.145, 0.001));
+      },
+    );
+
     test('throws when biological sex is unspecified', () {
       final now = DateTime.now();
 

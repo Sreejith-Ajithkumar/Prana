@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../meal_tracking/data/meal_storage.dart';
 import '../../meal_tracking/domain/entities/meal_entry.dart';
+import '../../nutrition/domain/services/nutrition_service.dart';
 import '../../profile/data/profile_storage.dart';
 import '../../water_tracking/data/water_storage.dart';
 
@@ -24,6 +25,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _consumedCarbs = 0;
   double _consumedFat = 0;
   double _consumedWaterMl = 0;
+
+  double _calorieTarget = 0;
+  double _proteinTarget = 0;
+  double _carbTarget = 0;
+  double _fatTarget = 0;
+  double _waterTargetMl = 0;
+
+  String _goalName = '';
 
   @override
   void initState() {
@@ -57,6 +66,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
       waterMl += entry.amountMl;
     }
 
+    double calorieTarget = 0;
+    double proteinTarget = 0;
+    double carbTarget = 0;
+    double fatTarget = 0;
+    double waterTargetMl = 0;
+    String goalName = '';
+
+    if (profile != null) {
+      try {
+        const nutritionService = NutritionService();
+
+        final targets = nutritionService.calculate(profile);
+
+        calorieTarget = targets.calories;
+        proteinTarget = targets.protein;
+        carbTarget = targets.carbohydrates;
+        fatTarget = targets.fat;
+        waterTargetMl = targets.waterLitres * 1000;
+
+        goalName = _formatGoalName(profile.goal.name);
+      } catch (error, stackTrace) {
+        debugPrint('DASHBOARD TARGET ERROR: $error');
+
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+
     if (!mounted) {
       return;
     }
@@ -70,6 +106,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _consumedCarbs = carbs;
       _consumedFat = fat;
       _consumedWaterMl = waterMl;
+
+      _calorieTarget = calorieTarget;
+      _proteinTarget = proteinTarget;
+      _carbTarget = carbTarget;
+      _fatTarget = fatTarget;
+      _waterTargetMl = waterTargetMl;
+
+      _goalName = goalName;
 
       _isLoading = false;
     });
@@ -93,18 +137,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '$greeting, $firstName 👋';
   }
 
-  String _formatWater() {
-    if (_consumedWaterMl < 1000) {
-      return '${_consumedWaterMl.toStringAsFixed(0)} mL';
-    }
-
-    final litres = _consumedWaterMl / 1000;
-
-    if (litres == litres.roundToDouble()) {
-      return '${litres.toStringAsFixed(0)} L';
-    }
-
-    return '${litres.toStringAsFixed(2)} L';
+  static String _formatGoalName(String value) {
+    return switch (value) {
+      'loseWeight' => 'Weight loss',
+      'maintainWeight' => 'Maintain weight',
+      'gainMuscle' => 'Gain muscle',
+      'improveHealth' => 'Improve health',
+      _ => 'Personal goal',
+    };
   }
 
   Future<void> _openAddMeal() async {
@@ -166,35 +206,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
+
+                    if (_goalName.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Goal: $_goalName',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 24),
 
-                    // Calories
-                    _SummaryCard(
+                    _GoalSummaryCard(
                       title: 'Calories',
-                      value: _consumedCalories.toStringAsFixed(0),
-                      subtitle: 'consumed today',
+                      consumed: _consumedCalories,
+                      target: _calorieTarget,
+                      unit: 'kcal',
                       icon: Icons.local_fire_department_outlined,
+                      targetDescription:
+                          'Estimated daily calorie target for your current goal.',
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Protein + Water
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: _MetricCard(
+                          child: _GoalMetricCard(
                             title: 'Protein',
-                            value: '${_consumedProtein.toStringAsFixed(0)} g',
+                            consumed: _consumedProtein,
+                            target: _proteinTarget,
+                            unit: 'g',
                             icon: Icons.fitness_center,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _MetricCard(
+                          child: _GoalMetricCard(
                             title: 'Water',
-                            value: _formatWater(),
+                            consumed: _consumedWaterMl,
+                            target: _waterTargetMl,
+                            unit: 'mL',
                             icon: Icons.water_drop_outlined,
+                            displayAsLitres: true,
                             onTap: _openWaterTracking,
                           ),
                         ),
@@ -203,29 +260,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Carbs + Fat
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: _MetricCard(
+                          child: _GoalMetricCard(
                             title: 'Carbs',
-                            value: '${_consumedCarbs.toStringAsFixed(0)} g',
+                            consumed: _consumedCarbs,
+                            target: _carbTarget,
+                            unit: 'g',
                             icon: Icons.rice_bowl_outlined,
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
-                          child: _MetricCard(
+                          child: _GoalMetricCard(
                             title: 'Fat',
-                            value: '${_consumedFat.toStringAsFixed(0)} g',
+                            consumed: _consumedFat,
+                            target: _fatTarget,
+                            unit: 'g',
                             icon: Icons.eco_outlined,
                           ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 28),
 
                     Row(
                       children: [
@@ -279,50 +339,112 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _GoalSummaryCard extends StatelessWidget {
+  const _GoalSummaryCard({
     required this.title,
-    required this.value,
-    required this.subtitle,
+    required this.consumed,
+    required this.target,
+    required this.unit,
     required this.icon,
+    required this.targetDescription,
   });
 
   final String title;
-  final String value;
-  final String subtitle;
+  final double consumed;
+  final double target;
+  final String unit;
   final IconData icon;
+  final String targetDescription;
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final hasTarget = target > 0;
+
+    final progress = hasTarget ? (consumed / target).clamp(0.0, 1.0) : 0.0;
+
+    final remaining = hasTarget ? target - consumed : 0.0;
+
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: colors.primaryContainer,
-              child: Icon(icon, color: colors.onPrimaryContainer),
-            ),
-            const SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer,
+                  child: Icon(
+                    icon,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
-                  Text(subtitle),
-                ],
-              ),
+                ),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title),
+                      const SizedBox(height: 4),
+                      Text(
+                        hasTarget
+                            ? '${consumed.toStringAsFixed(0)} / '
+                                  '${target.toStringAsFixed(0)} $unit'
+                            : '${consumed.toStringAsFixed(0)} $unit',
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+
+            if (hasTarget) ...[
+              const SizedBox(height: 20),
+
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: progress),
+                duration: disableAnimations
+                    ? Duration.zero
+                    : const Duration(milliseconds: 650),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) {
+                  return LinearProgressIndicator(
+                    value: value,
+                    minHeight: 10,
+                    borderRadius: BorderRadius.circular(20),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              Text(
+                remaining > 0
+                    ? '${remaining.toStringAsFixed(0)} $unit remaining to target'
+                    : remaining == 0
+                    ? 'Daily target reached'
+                    : '${remaining.abs().toStringAsFixed(0)} $unit above target',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+
+              const SizedBox(height: 6),
+
+              Text(
+                targetDescription,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -330,27 +452,39 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+class _GoalMetricCard extends StatelessWidget {
+  const _GoalMetricCard({
     required this.title,
-    required this.value,
+    required this.consumed,
+    required this.target,
+    required this.unit,
     required this.icon,
+    this.displayAsLitres = false,
     this.onTap,
   });
 
   final String title;
-  final String value;
+  final double consumed;
+  final double target;
+  final String unit;
   final IconData icon;
+  final bool displayAsLitres;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final hasTarget = target > 0;
+
+    final progress = hasTarget ? (consumed / target).clamp(0.0, 1.0) : 0.0;
+
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -361,20 +495,70 @@ class _MetricCard extends StatelessWidget {
                   if (onTap != null) const Icon(Icons.chevron_right, size: 20),
                 ],
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 14),
+
               Text(title),
+
               const SizedBox(height: 4),
+
               Text(
-                value,
+                _formatValue(consumed),
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
+
+              if (hasTarget) ...[
+                const SizedBox(height: 2),
+
+                Text(
+                  'of ${_formatValue(target)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0, end: progress),
+                  duration: disableAnimations
+                      ? Duration.zero
+                      : const Duration(milliseconds: 650),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return LinearProgressIndicator(
+                      value: value,
+                      minHeight: 7,
+                      borderRadius: BorderRadius.circular(20),
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _formatValue(double value) {
+    if (displayAsLitres) {
+      final litres = value / 1000;
+
+      if (litres == litres.roundToDouble()) {
+        return '${litres.toStringAsFixed(0)} L';
+      }
+
+      return '${litres.toStringAsFixed(2)} L';
+    }
+
+    if (value == value.roundToDouble()) {
+      return '${value.toStringAsFixed(0)} $unit';
+    }
+
+    return '${value.toStringAsFixed(1)} $unit';
   }
 }
 
@@ -429,13 +613,11 @@ class _MealCard extends StatelessWidget {
   }
 
   static String _buildMacroSummary(MealEntry meal) {
-    final protein = meal.proteinGrams.toStringAsFixed(0);
-
-    final carbs = meal.carbohydrateGrams.toStringAsFixed(0);
-
-    final fat = meal.fatGrams.toStringAsFixed(0);
-
-    return 'P $protein g • C $carbs g • F $fat g';
+    return 'P ${meal.proteinGrams.toStringAsFixed(0)} g'
+        ' • '
+        'C ${meal.carbohydrateGrams.toStringAsFixed(0)} g'
+        ' • '
+        'F ${meal.fatGrams.toStringAsFixed(0)} g';
   }
 
   static String _formatMealType(String value) {
