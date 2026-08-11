@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../nutrition/domain/nutrition_service.dart';
+import '../../../nutrition/domain/services/nutrition_service.dart';
 import '../../../profile/data/profile_storage.dart';
 import '../../data/water_storage.dart';
 import '../../domain/entities/water_entry.dart';
@@ -11,8 +11,7 @@ class WaterTrackingScreen extends StatefulWidget {
   const WaterTrackingScreen({super.key});
 
   @override
-  State<WaterTrackingScreen> createState() =>
-      _WaterTrackingScreenState();
+  State<WaterTrackingScreen> createState() => _WaterTrackingScreenState();
 }
 
 class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
@@ -26,10 +25,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
   bool _isSaving = false;
 
   double get _totalMl {
-    return _entries.fold(
-      0.0,
-      (total, entry) => total + entry.amountMl,
-    );
+    return _entries.fold(0.0, (total, entry) => total + entry.amountMl);
   }
 
   double get _remainingMl {
@@ -64,11 +60,9 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
 
   Future<void> _loadScreen() async {
     try {
-      final profile =
-          await ProfileStorage.instance.loadProfile();
+      final profile = await ProfileStorage.instance.loadProfile();
 
-      final entries =
-          await WaterStorage.instance.loadEntriesForDate(
+      final entries = await WaterStorage.instance.loadEntriesForDate(
         DateTime.now(),
       );
 
@@ -76,20 +70,15 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
 
       if (profile != null) {
         try {
-          const nutritionService = NutritionService();
+          final nutritionService = NutritionService();
 
-          final targets =
-              nutritionService.calculate(profile);
+          final targets = nutritionService.calculate(profile);
 
           targetMl = targets.waterLitres * 1000;
         } catch (error, stackTrace) {
-          debugPrint(
-            'WATER TARGET ERROR: $error',
-          );
+          debugPrint('WATER TARGET ERROR: $error');
 
-          debugPrintStack(
-            stackTrace: stackTrace,
-          );
+          debugPrintStack(stackTrace: stackTrace);
         }
       }
 
@@ -103,13 +92,9 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
         _isLoading = false;
       });
     } catch (error, stackTrace) {
-      debugPrint(
-        'WATER LOAD ERROR: $error',
-      );
+      debugPrint('WATER LOAD ERROR: $error');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) {
         return;
@@ -123,9 +108,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
     }
   }
 
-  Future<void> _addWater(
-    double amountMl,
-  ) async {
+  Future<void> _addWater(double amountMl) async {
     if (_isSaving || amountMl <= 0) {
       return;
     }
@@ -143,30 +126,20 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
         loggedAt: now,
       );
 
-      await WaterStorage.instance.addEntry(
-        entry,
-      );
+      await WaterStorage.instance.addEntry(entry);
 
       await _loadScreen();
     } catch (error, stackTrace) {
-      debugPrint(
-        'WATER SAVE ERROR: $error',
-      );
+      debugPrint('WATER SAVE ERROR: $error');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'We could not save your water entry.',
-          ),
-        ),
+        const SnackBar(content: Text('We could not save your water entry.')),
       );
     } finally {
       if (mounted) {
@@ -178,17 +151,11 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
   }
 
   Future<void> _addCustomWater() async {
-    final amount = double.tryParse(
-      _customAmountController.text.trim(),
-    );
+    final amount = double.tryParse(_customAmountController.text.trim());
 
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Enter a valid water amount.',
-          ),
-        ),
+        const SnackBar(content: Text('Enter a valid water amount.')),
       );
 
       return;
@@ -205,29 +172,19 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
     _customAmountController.clear();
   }
 
-  Future<void> _deleteEntry(
-    WaterEntry entry,
-  ) async {
+  Future<void> _deleteEntry(WaterEntry entry) async {
     try {
-      await WaterStorage.instance.deleteEntry(
-        entry.id,
-      );
+      await WaterStorage.instance.deleteEntry(entry.id);
 
       await _loadScreen();
     } catch (error, stackTrace) {
-      debugPrint(
-        'WATER DELETE ERROR: $error',
-      );
+      debugPrint('WATER DELETE ERROR: $error');
 
-      debugPrintStack(
-        stackTrace: stackTrace,
-      );
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
-  String _formatVolume(
-    double amountMl,
-  ) {
+  String _formatVolume(double amountMl) {
     if (amountMl < 1000) {
       return '${amountMl.toStringAsFixed(0)} mL';
     }
@@ -244,21 +201,12 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Water'),
-      ),
+      appBar: AppBar(title: const Text('Water')),
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(),
-              )
+            ? const Center(child: CircularProgressIndicator())
             : ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  24,
-                  24,
-                  24,
-                  32,
-                ),
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
                 children: [
                   _WaterGoalCard(
                     consumedMl: _totalMl,
@@ -270,12 +218,9 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
                   const SizedBox(height: 28),
                   Text(
                     'Quick add',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -315,40 +260,28 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
                   const SizedBox(height: 28),
                   Text(
                     'Custom amount',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: TextField(
-                          controller:
-                              _customAmountController,
-                          decoration:
-                              const InputDecoration(
-                            labelText:
-                                'Water amount',
+                          controller: _customAmountController,
+                          decoration: const InputDecoration(
+                            labelText: 'Water amount',
                             suffixText: 'mL',
                             hintText: '350',
                           ),
-                          keyboardType:
-                              const TextInputType
-                                  .numberWithOptions(
+                          keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
                           inputFormatters: [
-                            FilteringTextInputFormatter
-                                .allow(
-                              RegExp(
-                                r'^\d{0,5}(\.\d{0,1})?',
-                              ),
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d{0,5}(\.\d{0,1})?'),
                             ),
                           ],
                           onSubmitted: (_) {
@@ -360,11 +293,8 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
                       SizedBox(
                         width: 90,
                         child: FilledButton(
-                          onPressed: _isSaving
-                              ? null
-                              : _addCustomWater,
-                          child:
-                              const Text('Add'),
+                          onPressed: _isSaving ? null : _addCustomWater,
+                          child: const Text('Add'),
                         ),
                       ),
                     ],
@@ -375,13 +305,8 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
                       Expanded(
                         child: Text(
                           'Today',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(
-                                fontWeight:
-                                    FontWeight.bold,
-                              ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
                       Text(
@@ -396,10 +321,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
                   else
                     ..._entries.reversed.map(
                       (entry) => Padding(
-                        padding:
-                            const EdgeInsets.only(
-                          bottom: 8,
-                        ),
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: _WaterEntryCard(
                           entry: entry,
                           onDelete: () {
@@ -412,12 +334,7 @@ class _WaterTrackingScreenState extends State<WaterTrackingScreen> {
               ),
       ),
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(
-          24,
-          8,
-          24,
-          16,
-        ),
+        minimum: const EdgeInsets.fromLTRB(24, 8, 24, 16),
         child: FilledButton(
           onPressed: () {
             context.pop(true);
@@ -452,47 +369,33 @@ class _WaterGoalCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor:
-                      Theme.of(context)
-                          .colorScheme
-                          .primaryContainer,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer,
                   child: Icon(
                     Icons.water_drop_outlined,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onPrimaryContainer,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(width: 20),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Water today',
-                      ),
+                      const Text('Water today'),
                       const SizedBox(height: 4),
                       Text(
                         hasTarget
                             ? '${formatVolume(consumedMl)} / ${formatVolume(targetMl)}'
-                            : formatVolume(
-                                consumedMl,
-                              ),
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              fontWeight:
-                                  FontWeight.bold,
-                            ),
+                            : formatVolume(consumedMl),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                     ],
                   ),
@@ -504,29 +407,21 @@ class _WaterGoalCard extends StatelessWidget {
               LinearProgressIndicator(
                 value: progress,
                 minHeight: 10,
-                borderRadius:
-                    BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(20),
               ),
               const SizedBox(height: 12),
               Text(
                 remainingMl > 0
                     ? '${formatVolume(remainingMl)} remaining'
                     : 'Daily water goal reached',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 6),
               Text(
                 'Estimated daily hydration target based on your profile.',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                    ),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -552,8 +447,7 @@ class _QuickWaterButton extends StatelessWidget {
     return SizedBox(
       width: 140,
       child: FilledButton.tonalIcon(
-        onPressed:
-            enabled ? onPressed : null,
+        onPressed: enabled ? onPressed : null,
         icon: const Icon(Icons.add),
         label: Text(label),
       ),
@@ -562,47 +456,30 @@ class _QuickWaterButton extends StatelessWidget {
 }
 
 class _WaterEntryCard extends StatelessWidget {
-  const _WaterEntryCard({
-    required this.entry,
-    required this.onDelete,
-  });
+  const _WaterEntryCard({required this.entry, required this.onDelete});
 
   final WaterEntry entry;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
-    final time =
-        TimeOfDay.fromDateTime(
-      entry.loggedAt,
-    );
+    final time = TimeOfDay.fromDateTime(entry.loggedAt);
 
     return Card(
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor:
-              Theme.of(context)
-                  .colorScheme
-                  .primaryContainer,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           child: Icon(
             Icons.local_drink_outlined,
-            color: Theme.of(context)
-                .colorScheme
-                .onPrimaryContainer,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
           ),
         ),
-        title: Text(
-          '${entry.amountMl.toStringAsFixed(0)} mL',
-        ),
-        subtitle: Text(
-          time.format(context),
-        ),
+        title: Text('${entry.amountMl.toStringAsFixed(0)} mL'),
+        subtitle: Text(time.format(context)),
         trailing: IconButton(
           tooltip: 'Delete water entry',
           onPressed: onDelete,
-          icon: const Icon(
-            Icons.delete_outline,
-          ),
+          icon: const Icon(Icons.delete_outline),
         ),
       ),
     );
@@ -622,19 +499,14 @@ class _EmptyWaterState extends StatelessWidget {
             Icon(
               Icons.water_drop_outlined,
               size: 48,
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(height: 16),
             Text(
               'No water logged yet',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             const Text(
