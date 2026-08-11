@@ -22,6 +22,8 @@ import '../../features/meal_tracking/presentation/screens/food_search_screen.dar
 import '../features/meal_tracking/domain/entities/meal_entry.dart';
 import '../features/meal_tracking/presentation/screens/edit_meal_screen.dart';
 
+import '../features/water_tracking/presentation/screens/water_tracking_screen.dart';
+
 final OnboardingController onboardingController = OnboardingController();
 
 Widget _withOnboardingScope(Widget child) {
@@ -137,6 +139,12 @@ final GoRouter appRouter = GoRouter(
 
         return EditMealScreen(meal: meal);
       },
+    ),
+
+    GoRoute(
+      path: '/water',
+      name: 'water',
+      builder: (context, state) => const WaterTrackingScreen(),
     ),
   ],
   errorBuilder: (context, state) {

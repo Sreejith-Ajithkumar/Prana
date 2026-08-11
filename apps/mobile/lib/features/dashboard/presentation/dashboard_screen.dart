@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../meal_tracking/data/meal_storage.dart';
 import '../../meal_tracking/domain/entities/meal_entry.dart';
 import '../../profile/data/profile_storage.dart';
+import '../../water_tracking/data/water_storage.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _consumedProtein = 0;
   double _consumedCarbs = 0;
   double _consumedFat = 0;
+  double _consumedWaterMl = 0;
 
   @override
   void initState() {
@@ -30,26 +32,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadDashboard() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-      });
-    }
+    final today = DateTime.now();
 
     final profile = await ProfileStorage.instance.loadProfile();
 
-    final meals = await MealStorage.instance.loadMealsForDate(DateTime.now());
+    final meals = await MealStorage.instance.loadMealsForDate(today);
+
+    final waterEntries = await WaterStorage.instance.loadEntriesForDate(today);
 
     double calories = 0;
     double protein = 0;
     double carbs = 0;
     double fat = 0;
+    double waterMl = 0;
 
     for (final meal in meals) {
       calories += meal.calories;
       protein += meal.proteinGrams;
       carbs += meal.carbohydrateGrams;
       fat += meal.fatGrams;
+    }
+
+    for (final entry in waterEntries) {
+      waterMl += entry.amountMl;
     }
 
     if (!mounted) {
@@ -64,6 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _consumedProtein = protein;
       _consumedCarbs = carbs;
       _consumedFat = fat;
+      _consumedWaterMl = waterMl;
 
       _isLoading = false;
     });
@@ -87,16 +93,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '$greeting, $firstName 👋';
   }
 
-  Future<void> _openEditMeal(MealEntry meal) async {
-    final changed = await context.push<bool>('/meals/edit', extra: meal);
-
-    if (!mounted) {
-      return;
+  String _formatWater() {
+    if (_consumedWaterMl < 1000) {
+      return '${_consumedWaterMl.toStringAsFixed(0)} mL';
     }
 
-    if (changed == true) {
-      await _loadDashboard();
+    final litres = _consumedWaterMl / 1000;
+
+    if (litres == litres.roundToDouble()) {
+      return '${litres.toStringAsFixed(0)} L';
     }
+
+    return '${litres.toStringAsFixed(2)} L';
   }
 
   Future<void> _openAddMeal() async {
@@ -111,6 +119,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _openEditMeal(MealEntry meal) async {
+    final changed = await context.push<bool>('/meals/edit', extra: meal);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (changed == true) {
+      await _loadDashboard();
+    }
+  }
+
+  Future<void> _openWaterTracking() async {
+    final changed = await context.push<bool>('/water');
+
+    if (!mounted) {
+      return;
+    }
+
+    if (changed == true) {
+      await _loadDashboard();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,6 +153,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             : RefreshIndicator(
                 onRefresh: _loadDashboard,
                 child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
                   children: [
                     Text(
@@ -134,14 +167,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 24),
+
+                    // Calories
                     _SummaryCard(
                       title: 'Calories',
                       value: _consumedCalories.toStringAsFixed(0),
                       subtitle: 'consumed today',
                       icon: Icons.local_fire_department_outlined,
                     ),
+
                     const SizedBox(height: 16),
+
+                    // Protein + Water
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: _MetricCard(
@@ -151,17 +190,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Expanded(
+                        Expanded(
                           child: _MetricCard(
                             title: 'Water',
-                            value: '0 L',
+                            value: _formatWater(),
                             icon: Icons.water_drop_outlined,
+                            onTap: _openWaterTracking,
                           ),
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 16),
+
+                    // Carbs + Fat
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: _MetricCard(
@@ -180,7 +224,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 24),
+
                     Row(
                       children: [
                         Expanded(
@@ -203,7 +249,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                       ],
                     ),
+
                     const SizedBox(height: 12),
+
                     if (_todayMeals.isEmpty)
                       const _EmptyState()
                     else
@@ -212,7 +260,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _MealCard(
                             meal: meal,
-                            onTap: () => _openEditMeal(meal),
+                            onTap: () {
+                              _openEditMeal(meal);
+                            },
                           ),
                         ),
                       ),
@@ -285,31 +335,43 @@ class _MetricCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.icon,
+    this.onTap,
   });
 
   final String title;
   final String value;
   final IconData icon;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon),
-            const SizedBox(height: 16),
-            Text(title),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ],
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon),
+                  const Spacer(),
+                  if (onTap != null) const Icon(Icons.chevron_right, size: 20),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(title),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
         ),
       ),
     );

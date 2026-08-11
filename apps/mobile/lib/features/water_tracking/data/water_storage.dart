@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/entities/water_entry.dart';
@@ -11,16 +12,20 @@ class WaterStorage {
 
   static const String _waterKey = 'prana_water_entries';
 
-  final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
+  Future<SharedPreferences> _getPreferences() {
+    return SharedPreferences.getInstance();
+  }
 
   Future<List<WaterEntry>> loadEntries() async {
-    final encoded = await _preferences.getString(_waterKey);
-
-    if (encoded == null || encoded.isEmpty) {
-      return [];
-    }
-
     try {
+      final preferences = await _getPreferences();
+
+      final encoded = preferences.getString(_waterKey);
+
+      if (encoded == null || encoded.isEmpty) {
+        return [];
+      }
+
       final decoded = jsonDecode(encoded);
 
       if (decoded is! List<dynamic>) {
@@ -28,7 +33,10 @@ class WaterStorage {
       }
 
       return decoded
-          .map((item) => WaterEntry.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                WaterEntry.fromJson(Map<String, dynamic>.from(item as Map)),
+          )
           .toList();
     } on FormatException {
       return [];
@@ -36,19 +44,29 @@ class WaterStorage {
       return [];
     } on ArgumentError {
       return [];
+    } catch (error, stackTrace) {
+      debugPrint('WATER STORAGE LOAD ERROR: $error');
+
+      debugPrintStack(stackTrace: stackTrace);
+
+      return [];
     }
   }
 
   Future<void> saveEntries(List<WaterEntry> entries) async {
+    final preferences = await _getPreferences();
+
     final encoded = jsonEncode(entries.map((entry) => entry.toJson()).toList());
 
-    await _preferences.setString(_waterKey, encoded);
+    await preferences.setString(_waterKey, encoded);
   }
 
   Future<void> addEntry(WaterEntry entry) async {
     final entries = await loadEntries();
 
-    await saveEntries([...entries, entry]);
+    final updatedEntries = [...entries, entry];
+
+    await saveEntries(updatedEntries);
   }
 
   Future<void> deleteEntry(String entryId) async {
@@ -78,6 +96,8 @@ class WaterStorage {
   }
 
   Future<void> clearEntries() async {
-    await _preferences.remove(_waterKey);
+    final preferences = await _getPreferences();
+
+    await preferences.remove(_waterKey);
   }
 }
