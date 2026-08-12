@@ -23,6 +23,9 @@ import '../features/meal_tracking/domain/entities/meal_entry.dart';
 import '../features/meal_tracking/presentation/screens/edit_meal_screen.dart';
 
 import '../features/water_tracking/presentation/screens/water_tracking_screen.dart';
+import '../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../features/profile/presentation/screens/profile_screen.dart';
+import '../features/profile/domain/entities/user_profile.dart';
 
 final OnboardingController onboardingController = OnboardingController();
 
@@ -113,6 +116,23 @@ final GoRouter appRouter = GoRouter(
         return _withOnboardingScope(const ReviewScreen());
       },
     ),
+
+    GoRoute(
+      path: '/profile',
+      name: 'profile',
+      builder: (context, state) => const ProfileScreen(),
+    ),
+
+    GoRoute(
+      path: '/profile/edit',
+      name: 'edit-profile',
+      builder: (context, state) {
+        final profile = state.extra! as UserProfile;
+
+        return EditProfileScreen(profile: profile);
+      },
+    ),
+
     GoRoute(
       path: '/dashboard',
       name: 'dashboard',

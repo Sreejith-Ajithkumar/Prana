@@ -71,6 +71,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     double carbTarget = 0;
     double fatTarget = 0;
     double waterTargetMl = 0;
+
     String goalName = '';
 
     if (profile != null) {
@@ -134,7 +135,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return greeting;
     }
 
-    return '$greeting, $firstName 👋';
+    return '$greeting, $firstName \u{1F44B}';
   }
 
   static String _formatGoalName(String value) {
@@ -183,150 +184,174 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  Future<void> _openProfile() async {
+    await context.push('/profile');
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadDashboard();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Prana')),
+      appBar: AppBar(
+        title: const Text('Prana'),
+        actions: [
+          IconButton(
+            tooltip: 'Profile',
+            onPressed: _openProfile,
+            icon: const Icon(Icons.person_outline),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
                 onRefresh: _loadDashboard,
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
-                  children: [
-                    Text(
-                      _buildGreeting(),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Your health summary',
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+                child: LayoutBuilder(
+                  builder: (context, viewportConstraints) {
+                    final horizontalPadding = viewportConstraints.maxWidth < 370
+                        ? 16.0
+                        : 20.0;
 
-                    if (_goalName.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'Goal: $_goalName',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                    return ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPadding,
+                        24,
+                        horizontalPadding,
+                        128,
                       ),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    _GoalSummaryCard(
-                      title: 'Calories',
-                      consumed: _consumedCalories,
-                      target: _calorieTarget,
-                      unit: 'kcal',
-                      icon: Icons.local_fire_department_outlined,
-                      targetDescription:
-                          'Estimated daily calorie target for your current goal.',
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: _GoalMetricCard(
+                        Text(
+                          _buildGreeting(),
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+
+                        const SizedBox(height: 4),
+
+                        Text(
+                          'Your health summary',
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+
+                        if (_goalName.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              'Goal: $_goalName',
+                              key: ValueKey(_goalName),
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        _GoalSummaryCard(
+                          title: 'Calories',
+                          consumed: _consumedCalories,
+                          target: _calorieTarget,
+                          unit: 'kcal',
+                          icon: Icons.local_fire_department_outlined,
+                          targetDescription:
+                              'Estimated daily calorie target for your current goal.',
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        _MetricGrid(
+                          protein: _GoalMetricCard(
                             title: 'Protein',
                             consumed: _consumedProtein,
                             target: _proteinTarget,
                             unit: 'g',
                             icon: Icons.fitness_center,
+                            metricType: _MetricType.protein,
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _GoalMetricCard(
+                          water: _GoalMetricCard(
                             title: 'Water',
                             consumed: _consumedWaterMl,
                             target: _waterTargetMl,
                             unit: 'mL',
                             icon: Icons.water_drop_outlined,
                             displayAsLitres: true,
+                            metricType: _MetricType.water,
                             onTap: _openWaterTracking,
                           ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _GoalMetricCard(
+                          carbs: _GoalMetricCard(
                             title: 'Carbs',
                             consumed: _consumedCarbs,
                             target: _carbTarget,
                             unit: 'g',
                             icon: Icons.rice_bowl_outlined,
+                            metricType: _MetricType.carbs,
                           ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _GoalMetricCard(
+                          fat: _GoalMetricCard(
                             title: 'Fat',
                             consumed: _consumedFat,
                             target: _fatTarget,
                             unit: 'g',
                             icon: Icons.eco_outlined,
+                            metricType: _MetricType.fat,
                           ),
                         ),
+
+                        const SizedBox(height: 28),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Today',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            if (_todayMeals.isNotEmpty)
+                              Text(
+                                '${_todayMeals.length} '
+                                '${_todayMeals.length == 1 ? 'meal' : 'meals'}',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        if (_todayMeals.isEmpty)
+                          const _EmptyState()
+                        else
+                          ..._todayMeals.map(
+                            (meal) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _MealCard(
+                                meal: meal,
+                                onTap: () {
+                                  _openEditMeal(meal);
+                                },
+                              ),
+                            ),
+                          ),
                       ],
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Today',
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        if (_todayMeals.isNotEmpty)
-                          Text(
-                            '${_todayMeals.length} '
-                            '${_todayMeals.length == 1 ? 'meal' : 'meals'}',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                ),
-                          ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    if (_todayMeals.isEmpty)
-                      const _EmptyState()
-                    else
-                      ..._todayMeals.map(
-                        (meal) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _MealCard(
-                            meal: meal,
-                            onTap: () {
-                              _openEditMeal(meal);
-                            },
-                          ),
-                        ),
-                      ),
-                  ],
+                    );
+                  },
                 ),
               ),
       ),
@@ -335,6 +360,228 @@ class _DashboardScreenState extends State<DashboardScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Add meal'),
       ),
+    );
+  }
+}
+
+enum _MetricType { calories, protein, water, carbs, fat }
+
+enum _GoalProgressState { normal, approaching, reached, above }
+
+_GoalProgressState _getProgressState({
+  required double consumed,
+  required double target,
+}) {
+  if (target <= 0) {
+    return _GoalProgressState.normal;
+  }
+
+  final ratio = consumed / target;
+
+  if (ratio < 0.75) {
+    return _GoalProgressState.normal;
+  }
+
+  if (ratio < 1.0) {
+    return _GoalProgressState.approaching;
+  }
+
+  if (ratio <= 1.10) {
+    return _GoalProgressState.reached;
+  }
+
+  return _GoalProgressState.above;
+}
+
+Color _progressColor(
+  BuildContext context,
+  _GoalProgressState state, {
+  required _MetricType metricType,
+}) {
+  final colors = Theme.of(context).colorScheme;
+
+  return switch (state) {
+    _GoalProgressState.normal => colors.primary,
+    _GoalProgressState.approaching => colors.tertiary,
+    _GoalProgressState.reached => colors.primary,
+    _GoalProgressState.above =>
+      metricType == _MetricType.water || metricType == _MetricType.protein
+          ? colors.primary
+          : colors.error,
+  };
+}
+
+String _progressLabel(
+  _GoalProgressState state, {
+  required _MetricType metricType,
+}) {
+  return switch (state) {
+    _GoalProgressState.normal => 'On track',
+    _GoalProgressState.approaching => 'Approaching target',
+    _GoalProgressState.reached => 'Target reached',
+    _GoalProgressState.above =>
+      metricType == _MetricType.water || metricType == _MetricType.protein
+          ? 'Target reached'
+          : 'Above target',
+  };
+}
+
+IconData _progressIcon(_GoalProgressState state) {
+  return switch (state) {
+    _GoalProgressState.normal => Icons.trending_up,
+    _GoalProgressState.approaching => Icons.timelapse,
+    _GoalProgressState.reached => Icons.check_circle_outline,
+    _GoalProgressState.above => Icons.info_outline,
+  };
+}
+
+class _MetricGrid extends StatelessWidget {
+  const _MetricGrid({
+    required this.protein,
+    required this.water,
+    required this.carbs,
+    required this.fat,
+  });
+
+  final Widget protein;
+  final Widget water;
+  final Widget carbs;
+  final Widget fat;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        /*
+         * Once the available content width gets too small,
+         * showing two metric cards side by side becomes
+         * cramped. Switch to a single-column layout instead.
+         */
+        final useSingleColumn = constraints.maxWidth < 330;
+
+        if (useSingleColumn) {
+          return Column(
+            children: [
+              protein,
+              const SizedBox(height: 12),
+              water,
+              const SizedBox(height: 12),
+              carbs,
+              const SizedBox(height: 12),
+              fat,
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: protein),
+                const SizedBox(width: 12),
+                Expanded(child: water),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: carbs),
+                const SizedBox(width: 12),
+                Expanded(child: fat),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _AnimatedMetricText extends StatelessWidget {
+  const _AnimatedMetricText({
+    required this.value,
+    required this.formatter,
+    required this.style,
+  });
+
+  final double value;
+  final String Function(double value) formatter;
+
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: value),
+      duration: disableAnimations
+          ? Duration.zero
+          : const Duration(milliseconds: 650),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedValue, child) {
+        return SizedBox(
+          width: double.infinity,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(formatter(animatedValue), maxLines: 1, style: style),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AnimatedConsumedTargetText extends StatelessWidget {
+  const _AnimatedConsumedTargetText({
+    required this.consumed,
+    required this.target,
+    required this.unit,
+    required this.style,
+  });
+
+  final double consumed;
+  final double target;
+  final String unit;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+
+    final duration = disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 650);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: consumed),
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedConsumed, child) {
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0, end: target),
+          duration: duration,
+          curve: Curves.easeOutCubic,
+          builder: (context, animatedTarget, child) {
+            final text = target > 0
+                ? '${animatedConsumed.toStringAsFixed(0)} / '
+                      '${animatedTarget.toStringAsFixed(0)} $unit'
+                : '${animatedConsumed.toStringAsFixed(0)} $unit';
+
+            return SizedBox(
+              width: double.infinity,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(text, maxLines: 1, style: style),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -364,11 +611,19 @@ class _GoalSummaryCard extends StatelessWidget {
 
     final remaining = hasTarget ? target - consumed : 0.0;
 
+    final state = _getProgressState(consumed: consumed, target: target);
+
+    final stateColor = _progressColor(
+      context,
+      state,
+      metricType: _MetricType.calories,
+    );
+
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -384,18 +639,19 @@ class _GoalSummaryCard extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
                 ),
-                const SizedBox(width: 20),
+
+                const SizedBox(width: 16),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title),
                       const SizedBox(height: 4),
-                      Text(
-                        hasTarget
-                            ? '${consumed.toStringAsFixed(0)} / '
-                                  '${target.toStringAsFixed(0)} $unit'
-                            : '${consumed.toStringAsFixed(0)} $unit',
+                      _AnimatedConsumedTargetText(
+                        consumed: consumed,
+                        target: target,
+                        unit: unit,
                         style: Theme.of(context).textTheme.headlineMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
@@ -409,7 +665,7 @@ class _GoalSummaryCard extends StatelessWidget {
               const SizedBox(height: 20),
 
               TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: progress),
+                tween: Tween<double>(begin: 0, end: progress),
                 duration: disableAnimations
                     ? Duration.zero
                     : const Duration(milliseconds: 650),
@@ -417,6 +673,8 @@ class _GoalSummaryCard extends StatelessWidget {
                 builder: (context, value, child) {
                   return LinearProgressIndicator(
                     value: value,
+                    color: stateColor,
+                    backgroundColor: stateColor.withValues(alpha: 0.15),
                     minHeight: 10,
                     borderRadius: BorderRadius.circular(20),
                   );
@@ -425,15 +683,39 @@ class _GoalSummaryCard extends StatelessWidget {
 
               const SizedBox(height: 12),
 
-              Text(
-                remaining > 0
-                    ? '${remaining.toStringAsFixed(0)} $unit remaining to target'
-                    : remaining == 0
-                    ? 'Daily target reached'
-                    : '${remaining.abs().toStringAsFixed(0)} $unit above target',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+              Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  Icon(_progressIcon(state), size: 18, color: stateColor),
+                  Text(
+                    _progressLabel(state, metricType: _MetricType.calories),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: stateColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              AnimatedSwitcher(
+                duration: disableAnimations
+                    ? Duration.zero
+                    : const Duration(milliseconds: 300),
+                child: Text(
+                  remaining > 0
+                      ? '${remaining.toStringAsFixed(0)} $unit remaining to target'
+                      : remaining == 0
+                      ? 'Daily target reached'
+                      : '${remaining.abs().toStringAsFixed(0)} $unit above target',
+                  key: ValueKey(remaining.toStringAsFixed(0)),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
               ),
 
               const SizedBox(height: 6),
@@ -459,6 +741,7 @@ class _GoalMetricCard extends StatelessWidget {
     required this.target,
     required this.unit,
     required this.icon,
+    required this.metricType,
     this.displayAsLitres = false,
     this.onTap,
   });
@@ -468,6 +751,7 @@ class _GoalMetricCard extends StatelessWidget {
   final double target;
   final String unit;
   final IconData icon;
+  final _MetricType metricType;
   final bool displayAsLitres;
   final VoidCallback? onTap;
 
@@ -477,69 +761,122 @@ class _GoalMetricCard extends StatelessWidget {
 
     final progress = hasTarget ? (consumed / target).clamp(0.0, 1.0) : 0.0;
 
+    final state = _getProgressState(consumed: consumed, target: target);
+
+    final stateColor = _progressColor(context, state, metricType: metricType);
+
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 155;
+
+        final cardPadding = compact ? 14.0 : 16.0;
+
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: EdgeInsets.all(cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(icon),
-                  const Spacer(),
-                  if (onTap != null) const Icon(Icons.chevron_right, size: 20),
+                  Row(
+                    children: [
+                      Icon(icon, size: compact ? 22 : 24),
+                      const Spacer(),
+                      if (onTap != null)
+                        const Icon(Icons.chevron_right, size: 20),
+                    ],
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  Text(
+                    title,
+                    style: compact
+                        ? Theme.of(context).textTheme.bodyLarge
+                        : null,
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  _AnimatedMetricText(
+                    value: consumed,
+                    formatter: _formatValue,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  if (hasTarget) ...[
+                    const SizedBox(height: 2),
+
+                    _AnimatedMetricText(
+                      value: target,
+                      formatter: (value) {
+                        return 'of ${_formatValue(value)}';
+                      },
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: progress),
+                      duration: disableAnimations
+                          ? Duration.zero
+                          : const Duration(milliseconds: 650),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return LinearProgressIndicator(
+                          value: value,
+                          color: stateColor,
+                          backgroundColor: stateColor.withValues(alpha: 0.15),
+                          minHeight: 7,
+                          borderRadius: BorderRadius.circular(20),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 1),
+                          child: Icon(
+                            _progressIcon(state),
+                            size: 14,
+                            color: stateColor,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            _progressLabel(state, metricType: metricType),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: stateColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
-
-              const SizedBox(height: 14),
-
-              Text(title),
-
-              const SizedBox(height: 4),
-
-              Text(
-                _formatValue(consumed),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-
-              if (hasTarget) ...[
-                const SizedBox(height: 2),
-
-                Text(
-                  'of ${_formatValue(target)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: progress),
-                  duration: disableAnimations
-                      ? Duration.zero
-                      : const Duration(milliseconds: 650),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, value, child) {
-                    return LinearProgressIndicator(
-                      value: value,
-                      minHeight: 7,
-                      borderRadius: BorderRadius.circular(20),
-                    );
-                  },
-                ),
-              ],
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -614,9 +951,9 @@ class _MealCard extends StatelessWidget {
 
   static String _buildMacroSummary(MealEntry meal) {
     return 'P ${meal.proteinGrams.toStringAsFixed(0)} g'
-        ' • '
+        ' \u2022 '
         'C ${meal.carbohydrateGrams.toStringAsFixed(0)} g'
-        ' • '
+        ' \u2022 '
         'F ${meal.fatGrams.toStringAsFixed(0)} g';
   }
 

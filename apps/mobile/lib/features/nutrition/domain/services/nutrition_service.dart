@@ -25,16 +25,13 @@ class NutritionService {
   final MacroCalculator macroCalculator;
   final WaterCalculator waterCalculator;
 
-  NutritionTargets calculate(
-    UserProfile profile,
-  ) {
+  NutritionTargets calculate(UserProfile profile) {
     final bmi = bmiCalculator.calculate(
       heightCm: profile.heightCm,
       weightKg: profile.weightKg,
     );
 
-    final bmiCategory =
-        bmiCalculator.category(bmi);
+    final bmiCategory = bmiCalculator.category(bmi);
 
     final bmr = bmrCalculator.calculate(
       biologicalSex: profile.biologicalSex,
@@ -60,9 +57,7 @@ class NutritionService {
       goal: profile.goal,
     );
 
-    final water = waterCalculator.calculate(
-      weightKg: profile.weightKg,
-    );
+    final water = waterCalculator.calculate(weightKg: profile.weightKg);
 
     return NutritionTargets(
       bmi: bmi,
