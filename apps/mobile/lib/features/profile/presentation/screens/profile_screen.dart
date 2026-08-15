@@ -52,6 +52,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _openWeightProgress() async {
+    await context.push('/weight');
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
@@ -77,14 +81,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 40),
                 children: [
                   _ProfileHeader(profile: profile),
+
                   const SizedBox(height: 24),
+
                   Text(
                     'Personal information',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
                   const SizedBox(height: 12),
+
                   _ProfileSection(
                     children: [
                       _ProfileRow(
@@ -109,14 +117,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 24),
+
                   Text(
                     'Goals',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+
                   const SizedBox(height: 12),
+
                   _ProfileSection(
                     children: [
                       _ProfileRow(
@@ -136,7 +148,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 24),
+
+                  Text(
+                    'Progress',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.monitor_weight_outlined),
+                      title: const Text('Weight & Progress'),
+                      subtitle: const Text(
+                        'Track measurements, history, and progress toward your goal.',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _openWeightProgress,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -157,7 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 24),
+
                   FilledButton.icon(
                     onPressed: _editProfile,
                     icon: const Icon(Icons.edit_outlined),

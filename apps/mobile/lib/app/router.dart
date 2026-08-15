@@ -23,6 +23,7 @@ import '../features/meal_tracking/domain/entities/meal_entry.dart';
 import '../features/meal_tracking/presentation/screens/edit_meal_screen.dart';
 
 import '../features/water_tracking/presentation/screens/water_tracking_screen.dart';
+import '../features/weight_tracking/presentation/screens/weight_tracking_screen.dart';
 import '../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
 import '../features/profile/domain/entities/user_profile.dart';
@@ -165,6 +166,12 @@ final GoRouter appRouter = GoRouter(
       path: '/water',
       name: 'water',
       builder: (context, state) => const WaterTrackingScreen(),
+    ),
+
+    GoRoute(
+      path: '/weight',
+      name: 'weight',
+      builder: (context, state) => const WeightTrackingScreen(),
     ),
   ],
   errorBuilder: (context, state) {
