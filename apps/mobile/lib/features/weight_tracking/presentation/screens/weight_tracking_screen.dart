@@ -5,6 +5,7 @@ import '../../../profile/domain/entities/user_profile.dart';
 import '../../data/weight_storage.dart';
 import '../../domain/entities/weight_entry.dart';
 import '../../domain/services/weight_trend_service.dart';
+import '../widgets/weight_trend_chart.dart';
 
 class WeightTrackingScreen extends StatefulWidget {
   const WeightTrackingScreen({super.key});
@@ -224,29 +225,34 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                children: [
-                  _buildProgressCard(),
-                  const SizedBox(height: 16),
-                  _buildGoalProgressCard(),
-                  const SizedBox(height: 16),
-                  _buildTrendCard(),
-                  const SizedBox(height: 24),
-                  Text(
-                    'History',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 88),
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  children: [
+                    _buildProgressCard(),
+                    const SizedBox(height: 16),
+                    _buildGoalProgressCard(),
+                    const SizedBox(height: 16),
+                    _buildTrendCard(),
+                    const SizedBox(height: 16),
+                    _buildChartCard(),
+                    const SizedBox(height: 24),
+                    Text(
+                      'History',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_entries.isEmpty)
-                    _buildEmptyState()
-                  else
-                    ..._entries.reversed.map(_buildEntryTile),
-                ],
+                    const SizedBox(height: 12),
+                    if (_entries.isEmpty)
+                      _buildEmptyState()
+                    else
+                      ..._entries.reversed.map(_buildEntryTile),
+                  ],
+                ),
               ),
             ),
     );
@@ -387,7 +393,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
               ),
               const SizedBox(height: 18),
               if (result.hasReachedGoal)
-                _ProgressMessage(
+                const _ProgressMessage(
                   icon: Icons.check_circle_outline,
                   title: 'At maintenance target',
                   subtitle:
@@ -496,7 +502,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
             ),
             if (movingAwayFromGoal) ...[
               const SizedBox(height: 16),
-              _ProgressNotice(
+              const _ProgressNotice(
                 icon: Icons.info_outline,
                 text:
                     'Your recent weight is currently moving away from '
@@ -506,7 +512,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
             ],
             if (result.hasReachedGoal) ...[
               const SizedBox(height: 16),
-              _ProgressNotice(
+              const _ProgressNotice(
                 icon: Icons.emoji_events_outlined,
                 text:
                     'You have reached or passed your selected goal '
@@ -514,25 +520,17 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                     'whether to maintain or set a new target.',
               ),
             ],
-            if (result.hasReliableTrend) ...[
-              const SizedBox(height: 14),
-              Text(
-                'Goal progress is based on your weight trend rather '
-                'than a single weigh-in.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            const SizedBox(height: 14),
+            Text(
+              result.hasReliableTrend
+                  ? 'Goal progress is based on your weight trend rather '
+                        'than a single weigh-in.'
+                  : 'Until a reliable trend is available, goal progress '
+                        'uses your latest measurement.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-            ] else ...[
-              const SizedBox(height: 14),
-              Text(
-                'Until a reliable trend is available, goal progress '
-                'uses your latest measurement.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+            ),
           ],
         ),
       ),
@@ -684,6 +682,56 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChartCard() {
+    final profile = _profile;
+
+    if (profile == null || _entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.insights_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Weight history',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Daily measurements and your rolling weight trend.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 20),
+            WeightTrendChart(
+              entries: _entries,
+              goalWeightKg: profile.goalWeightKg,
+              minimumTrendDays: _trendService.minimumTrendDays,
+              maximumTrendDays: _trendService.maximumTrendDays,
             ),
           ],
         ),
