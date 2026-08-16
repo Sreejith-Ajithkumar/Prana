@@ -1,5 +1,7 @@
 import '../entities/weight_entry.dart';
 
+enum WeightGoalDirection { lose, gain, maintain }
+
 class WeightTrendResult {
   const WeightTrendResult({
     required this.startingWeightKg,
@@ -8,6 +10,8 @@ class WeightTrendResult {
     required this.trendWeightKg,
     required this.distinctMeasurementDays,
   });
+
+  static const double _goalToleranceKg = 0.05;
 
   final double startingWeightKg;
   final double goalWeightKg;
@@ -20,6 +24,20 @@ class WeightTrendResult {
   bool get hasMeasurements => latestEntry != null;
 
   bool get hasReliableTrend => trendWeightKg != null;
+
+  WeightGoalDirection get goalDirection {
+    final difference = goalWeightKg - startingWeightKg;
+
+    if (difference.abs() < _goalToleranceKg) {
+      return WeightGoalDirection.maintain;
+    }
+
+    if (difference < 0) {
+      return WeightGoalDirection.lose;
+    }
+
+    return WeightGoalDirection.gain;
+  }
 
   /// Once a reliable trend exists, progress calculations use the trend
   /// instead of reacting to the latest individual measurement.
@@ -47,6 +65,66 @@ class WeightTrendResult {
     }
 
     return (weight - goalWeightKg).abs();
+  }
+
+  /// Amount of progress made in the intended goal direction.
+  ///
+  /// This value can be negative when the user has moved away from the goal.
+  double? get progressTowardGoalKg {
+    final weight = progressWeightKg;
+
+    if (weight == null) {
+      return null;
+    }
+
+    return switch (goalDirection) {
+      WeightGoalDirection.lose => startingWeightKg - weight,
+      WeightGoalDirection.gain => weight - startingWeightKg,
+      WeightGoalDirection.maintain => null,
+    };
+  }
+
+  double get totalGoalChangeKg {
+    return (goalWeightKg - startingWeightKg).abs();
+  }
+
+  /// Progress toward the weight goal from 0.0 to 1.0.
+  ///
+  /// Returns null for a maintenance goal because there is no directional
+  /// destination to measure as a percentage.
+  double? get progressFraction {
+    final progress = progressTowardGoalKg;
+
+    if (progress == null || totalGoalChangeKg < _goalToleranceKg) {
+      return null;
+    }
+
+    return (progress / totalGoalChangeKg).clamp(0.0, 1.0);
+  }
+
+  double? get progressPercentage {
+    final fraction = progressFraction;
+
+    if (fraction == null) {
+      return null;
+    }
+
+    return fraction * 100;
+  }
+
+  bool get hasReachedGoal {
+    final weight = progressWeightKg;
+
+    if (weight == null) {
+      return false;
+    }
+
+    return switch (goalDirection) {
+      WeightGoalDirection.lose => weight <= goalWeightKg + _goalToleranceKg,
+      WeightGoalDirection.gain => weight >= goalWeightKg - _goalToleranceKg,
+      WeightGoalDirection.maintain =>
+        (weight - goalWeightKg).abs() <= _goalToleranceKg,
+    };
   }
 }
 

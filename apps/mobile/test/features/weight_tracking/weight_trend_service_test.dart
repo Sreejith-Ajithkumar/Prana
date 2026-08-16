@@ -124,5 +124,81 @@ void main() {
 
       expect(result.distanceToGoalKg, closeTo(8, 0.001));
     });
+
+    test('calculates progress percentage for weight loss', () {
+      final result = service.calculate(
+        startingWeightKg: 65,
+        goalWeightKg: 52,
+        entries: [entry('1', 60, DateTime(2026, 8, 14))],
+      );
+
+      expect(result.goalDirection, WeightGoalDirection.lose);
+
+      expect(result.progressTowardGoalKg, closeTo(5, 0.001));
+
+      expect(result.totalGoalChangeKg, closeTo(13, 0.001));
+
+      expect(result.progressPercentage, closeTo(38.4615, 0.001));
+
+      expect(result.hasReachedGoal, isFalse);
+    });
+
+    test('calculates progress percentage for weight gain', () {
+      final result = service.calculate(
+        startingWeightKg: 60,
+        goalWeightKg: 70,
+        entries: [entry('1', 64, DateTime(2026, 8, 14))],
+      );
+
+      expect(result.goalDirection, WeightGoalDirection.gain);
+
+      expect(result.progressTowardGoalKg, closeTo(4, 0.001));
+
+      expect(result.progressPercentage, closeTo(40, 0.001));
+
+      expect(result.hasReachedGoal, isFalse);
+    });
+
+    test('progress percentage clamps to zero when moving away from goal', () {
+      final result = service.calculate(
+        startingWeightKg: 65,
+        goalWeightKg: 52,
+        entries: [entry('1', 67, DateTime(2026, 8, 14))],
+      );
+
+      expect(result.progressTowardGoalKg, closeTo(-2, 0.001));
+
+      expect(result.progressPercentage, closeTo(0, 0.001));
+
+      expect(result.hasReachedGoal, isFalse);
+    });
+
+    test('progress caps at 100 percent after passing goal', () {
+      final result = service.calculate(
+        startingWeightKg: 65,
+        goalWeightKg: 52,
+        entries: [entry('1', 51.5, DateTime(2026, 8, 14))],
+      );
+
+      expect(result.progressPercentage, closeTo(100, 0.001));
+
+      expect(result.hasReachedGoal, isTrue);
+    });
+
+    test('maintenance goal has no directional progress percentage', () {
+      final result = service.calculate(
+        startingWeightKg: 65,
+        goalWeightKg: 65,
+        entries: [entry('1', 65, DateTime(2026, 8, 14))],
+      );
+
+      expect(result.goalDirection, WeightGoalDirection.maintain);
+
+      expect(result.progressTowardGoalKg, isNull);
+
+      expect(result.progressPercentage, isNull);
+
+      expect(result.hasReachedGoal, isTrue);
+    });
   });
 }

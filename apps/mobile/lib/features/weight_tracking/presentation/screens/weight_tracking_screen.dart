@@ -52,7 +52,6 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
           builder: (context, setDialogState) {
             void saveWeight() {
               final normalizedInput = input.trim().replaceAll(',', '.');
-
               final parsed = double.tryParse(normalizedInput);
 
               if (parsed == null || parsed <= 0) {
@@ -232,6 +231,8 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                 children: [
                   _buildProgressCard(),
                   const SizedBox(height: 16),
+                  _buildGoalProgressCard(),
+                  const SizedBox(height: 16),
                   _buildTrendCard(),
                   const SizedBox(height: 24),
                   Text(
@@ -336,15 +337,200 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
             if (distanceToGoal != null) ...[
               const SizedBox(height: 12),
               _ProgressMessage(
-                icon: distanceToGoal < 0.05
+                icon: result.hasReachedGoal
                     ? Icons.emoji_events_outlined
                     : Icons.flag_outlined,
-                title: distanceToGoal < 0.05
+                title: result.hasReachedGoal
                     ? 'Goal weight reached'
                     : '${distanceToGoal.toStringAsFixed(1)} kg to goal',
                 subtitle: result.hasReliableTrend
                     ? 'Using your trend weight'
                     : 'Using your latest measurement',
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoalProgressCard() {
+    final result = _calculateTrend();
+
+    if (result == null || !result.hasMeasurements) {
+      return const SizedBox.shrink();
+    }
+
+    if (result.goalDirection == WeightGoalDirection.maintain) {
+      final distance = result.distanceToGoalKg ?? 0;
+
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.track_changes_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Goal progress',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              if (result.hasReachedGoal)
+                _ProgressMessage(
+                  icon: Icons.check_circle_outline,
+                  title: 'At maintenance target',
+                  subtitle:
+                      'Your current progress weight is close to your target.',
+                )
+              else
+                _ProgressMessage(
+                  icon: Icons.balance_outlined,
+                  title:
+                      '${distance.toStringAsFixed(1)} kg from maintenance target',
+                  subtitle:
+                      'Your goal is to remain close to your target weight.',
+                ),
+              if (result.hasReliableTrend) ...[
+                const SizedBox(height: 14),
+                Text(
+                  'This status is based on your weight trend.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    final percentage = result.progressPercentage ?? 0;
+    final fraction = result.progressFraction ?? 0;
+    final rawProgressKg = result.progressTowardGoalKg ?? 0;
+
+    final displayedProgressKg = rawProgressKg < 0 ? 0.0 : rawProgressKg;
+
+    final distanceToGoal = result.distanceToGoalKg ?? 0;
+    final movingAwayFromGoal = rawProgressKg < 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.track_changes_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Goal progress',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${percentage.toStringAsFixed(0)}%',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              value: fraction,
+              minHeight: 10,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _SummaryValue(
+                    label: 'Progress',
+                    value: '${displayedProgressKg.toStringAsFixed(1)} kg',
+                  ),
+                ),
+                Expanded(
+                  child: _SummaryValue(
+                    label: result.hasReachedGoal ? 'Status' : 'Remaining',
+                    value: result.hasReachedGoal
+                        ? 'Reached'
+                        : '${distanceToGoal.toStringAsFixed(1)} kg',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Start ${result.startingWeightKg.toStringAsFixed(1)} kg',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                Text(
+                  'Goal ${result.goalWeightKg.toStringAsFixed(1)} kg',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+            if (movingAwayFromGoal) ...[
+              const SizedBox(height: 16),
+              _ProgressNotice(
+                icon: Icons.info_outline,
+                text:
+                    'Your recent weight is currently moving away from '
+                    'your goal. Goal progress stays at 0% until your '
+                    'progress weight moves back toward the target.',
+              ),
+            ],
+            if (result.hasReachedGoal) ...[
+              const SizedBox(height: 16),
+              _ProgressNotice(
+                icon: Icons.emoji_events_outlined,
+                text:
+                    'You have reached or passed your selected goal '
+                    'weight. Future goal planning can help you decide '
+                    'whether to maintain or set a new target.',
+              ),
+            ],
+            if (result.hasReliableTrend) ...[
+              const SizedBox(height: 14),
+              Text(
+                'Goal progress is based on your weight trend rather '
+                'than a single weigh-in.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 14),
+              Text(
+                'Until a reliable trend is available, goal progress '
+                'uses your latest measurement.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -564,11 +750,13 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
 
   static String _changeFromStartText(double change) {
     if (change < -0.05) {
-      return '${change.abs().toStringAsFixed(1)} kg down from starting weight';
+      return '${change.abs().toStringAsFixed(1)} kg '
+          'down from starting weight';
     }
 
     if (change > 0.05) {
-      return '${change.toStringAsFixed(1)} kg up from starting weight';
+      return '${change.toStringAsFixed(1)} kg '
+          'up from starting weight';
     }
 
     return 'No meaningful change from starting weight';
@@ -642,6 +830,35 @@ class _ProgressMessage extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ProgressNotice extends StatelessWidget {
+  const _ProgressNotice({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodySmall),
+          ),
+        ],
+      ),
     );
   }
 }
