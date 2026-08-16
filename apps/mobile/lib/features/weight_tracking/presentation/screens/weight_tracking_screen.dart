@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../profile/data/profile_storage.dart';
 import '../../../profile/domain/entities/user_profile.dart';
+import '../../data/goal_pace_storage.dart';
 import '../../data/weight_storage.dart';
 import '../../domain/entities/weight_entry.dart';
+import '../../domain/services/goal_pace_service.dart';
 import '../../domain/services/weight_trend_service.dart';
 import '../widgets/weight_trend_chart.dart';
 
@@ -17,8 +19,13 @@ class WeightTrackingScreen extends StatefulWidget {
 class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
   static const WeightTrendService _trendService = WeightTrendService();
 
+  static const GoalPaceService _goalPaceService = GoalPaceService();
+
   UserProfile? _profile;
   List<WeightEntry> _entries = [];
+
+  double? _weeklyPaceKg;
+
   bool _isLoading = true;
 
   @override
@@ -29,7 +36,28 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
 
   Future<void> _loadData() async {
     final profile = await ProfileStorage.instance.loadProfile();
+
     final entries = await WeightStorage.instance.loadEntries();
+
+    double? weeklyPaceKg;
+
+    if (profile != null) {
+      final trendResult = _trendService.calculate(
+        startingWeightKg: profile.weightKg,
+        goalWeightKg: profile.goalWeightKg,
+        entries: entries,
+      );
+
+      final direction = trendResult.goalDirection;
+
+      if (direction != WeightGoalDirection.maintain) {
+        final storedPace = await GoalPaceStorage.instance.loadWeeklyPace(
+          direction,
+        );
+
+        weeklyPaceKg = _validatedPace(storedPace, direction);
+      }
+    }
 
     if (!mounted) {
       return;
@@ -38,8 +66,26 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
     setState(() {
       _profile = profile;
       _entries = entries;
+      _weeklyPaceKg = weeklyPaceKg;
       _isLoading = false;
     });
+  }
+
+  double _validatedPace(double? pace, WeightGoalDirection direction) {
+    final config = _paceConfig(direction);
+
+    if (pace == null || pace < config.minimum || pace > config.maximum) {
+      return config.defaultValue;
+    }
+
+    return pace;
+  }
+
+  Future<void> _saveGoalPace(
+    WeightGoalDirection direction,
+    double value,
+  ) async {
+    await GoalPaceStorage.instance.saveWeeklyPace(direction, value);
   }
 
   Future<void> _addWeight() async {
@@ -53,12 +99,14 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
           builder: (context, setDialogState) {
             void saveWeight() {
               final normalizedInput = input.trim().replaceAll(',', '.');
+
               final parsed = double.tryParse(normalizedInput);
 
               if (parsed == null || parsed <= 0) {
                 setDialogState(() {
                   errorText = 'Enter a valid weight.';
                 });
+
                 return;
               }
 
@@ -189,11 +237,34 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
 
   String _formatDateTime(DateTime date) {
     final month = date.month.toString().padLeft(2, '0');
+
     final day = date.day.toString().padLeft(2, '0');
+
     final hour = date.hour.toString().padLeft(2, '0');
+
     final minute = date.minute.toString().padLeft(2, '0');
 
     return '${date.year}-$month-$day $hour:$minute';
+  }
+
+  String _formatTargetDate(DateTime date) {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return '${months[date.month - 1]} '
+        '${date.day}, ${date.year}';
   }
 
   String _formatWeight(double? value) {
@@ -236,6 +307,8 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                     const SizedBox(height: 16),
                     _buildGoalProgressCard(),
                     const SizedBox(height: 16),
+                    _buildGoalPaceCard(),
+                    const SizedBox(height: 16),
                     _buildTrendCard(),
                     const SizedBox(height: 16),
                     _buildChartCard(),
@@ -272,6 +345,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
     }
 
     final changeFromStart = result.changeFromStartKg;
+
     final distanceToGoal = result.distanceToGoalKg;
 
     return Card(
@@ -407,15 +481,6 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                   subtitle:
                       'Your goal is to remain close to your target weight.',
                 ),
-              if (result.hasReliableTrend) ...[
-                const SizedBox(height: 14),
-                Text(
-                  'This status is based on your weight trend.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -423,12 +488,15 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
     }
 
     final percentage = result.progressPercentage ?? 0;
+
     final fraction = result.progressFraction ?? 0;
+
     final rawProgressKg = result.progressTowardGoalKg ?? 0;
 
     final displayedProgressKg = rawProgressKg < 0 ? 0.0 : rawProgressKg;
 
     final distanceToGoal = result.distanceToGoalKg ?? 0;
+
     final movingAwayFromGoal = rawProgressKg < 0;
 
     return Card(
@@ -516,8 +584,8 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                 icon: Icons.emoji_events_outlined,
                 text:
                     'You have reached or passed your selected goal '
-                    'weight. Future goal planning can help you decide '
-                    'whether to maintain or set a new target.',
+                    'weight. You can maintain this goal or choose a '
+                    'new target from your profile.',
               ),
             ],
             const SizedBox(height: 14),
@@ -531,6 +599,225 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoalPaceCard() {
+    final result = _calculateTrend();
+
+    if (result == null) {
+      return const SizedBox.shrink();
+    }
+
+    if (result.goalDirection == WeightGoalDirection.maintain) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_month_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Goal pace',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Maintenance goal',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'A target date is not needed for a maintenance '
+                'goal. Prana will focus on how closely your trend '
+                'stays around your target weight.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final config = _paceConfig(result.goalDirection);
+
+    final pace = (_weeklyPaceKg ?? config.defaultValue)
+        .clamp(config.minimum, config.maximum)
+        .toDouble();
+
+    final currentWeight = result.progressWeightKg ?? result.startingWeightKg;
+
+    final paceResult = _goalPaceService.calculate(
+      goalDirection: result.goalDirection,
+      currentWeightKg: currentWeight,
+      goalWeightKg: result.goalWeightKg,
+      weeklyPaceKg: pace,
+      fromDate: DateTime.now(),
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Goal pace',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            if (paceResult.goalReached) ...[
+              Text(
+                'Goal reached',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No target date estimate is needed while your '
+                'progress weight is at or beyond your selected goal.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Planned pace',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                  Text(
+                    '${pace.toStringAsFixed(2)} kg/week',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              Slider(
+                value: pace,
+                min: config.minimum,
+                max: config.maximum,
+                divisions: config.divisions,
+                label: '${pace.toStringAsFixed(2)} kg/week',
+                onChanged: (value) {
+                  setState(() {
+                    _weeklyPaceKg = value;
+                  });
+                },
+                onChangeEnd: (value) {
+                  _saveGoalPace(result.goalDirection, value);
+                },
+              ),
+
+              Row(
+                children: [
+                  Text('Slower', style: Theme.of(context).textTheme.bodySmall),
+                  const Spacer(),
+                  Text('Faster', style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+
+              const SizedBox(height: 22),
+
+              Text(
+                'Estimated target date',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 4),
+
+              Text(
+                paceResult.estimatedTargetDate == null
+                    ? '--'
+                    : _formatTargetDate(paceResult.estimatedTargetDate!),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _SummaryValue(
+                      label: 'Remaining',
+                      value: '${paceResult.remainingKg.toStringAsFixed(1)} kg',
+                    ),
+                  ),
+                  Expanded(
+                    child: _SummaryValue(
+                      label: 'Estimated time',
+                      value: paceResult.estimatedWeeksRemaining == null
+                          ? '--'
+                          : '${paceResult.estimatedWeeksRemaining!.toStringAsFixed(1)} weeks',
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              _ProgressNotice(
+                icon: Icons.info_outline,
+                text: result.hasReliableTrend
+                    ? 'This estimate uses your current weight trend. '
+                          'The date will move as your trend and selected '
+                          'pace change.'
+                    : result.hasMeasurements
+                    ? 'This estimate currently uses your latest '
+                          'measurement. Once Prana has a reliable trend, '
+                          'the estimate will use that instead.'
+                    : 'This estimate currently uses your starting '
+                          'weight. It will become more useful after you '
+                          'begin logging measurements.',
+              ),
+
+              const SizedBox(height: 12),
+
+              Text(
+                'Target dates are planning estimates. Real weight '
+                'change may not follow a perfectly steady weekly pace.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -580,6 +867,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
 
     if (!result.hasReliableTrend) {
       final minimumDays = _trendService.minimumTrendDays;
+
       final measuredDays = result.distinctMeasurementDays;
 
       final progress = (measuredDays / minimumDays).clamp(0.0, 1.0);
@@ -614,8 +902,8 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                '$measuredDays of $minimumDays different measurement days',
-                style: Theme.of(context).textTheme.bodyMedium,
+                '$measuredDays of $minimumDays '
+                'different measurement days',
               ),
               const SizedBox(height: 14),
               LinearProgressIndicator(value: progress),
@@ -671,7 +959,6 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
             Text(
               'Based on $usedDays recent measurement '
               '${usedDays == 1 ? 'day' : 'days'}',
-              style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
             Text(
@@ -809,6 +1096,45 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
 
     return 'No meaningful change from starting weight';
   }
+
+  static _PaceConfig _paceConfig(WeightGoalDirection direction) {
+    return switch (direction) {
+      WeightGoalDirection.lose => const _PaceConfig(
+        minimum: 0.1,
+        maximum: 0.9,
+        defaultValue: 0.4,
+        divisions: 8,
+      ),
+
+      WeightGoalDirection.gain => const _PaceConfig(
+        minimum: 0.1,
+        maximum: 0.5,
+        defaultValue: 0.25,
+        divisions: 8,
+      ),
+
+      WeightGoalDirection.maintain => const _PaceConfig(
+        minimum: 0,
+        maximum: 0,
+        defaultValue: 0,
+        divisions: 1,
+      ),
+    };
+  }
+}
+
+class _PaceConfig {
+  const _PaceConfig({
+    required this.minimum,
+    required this.maximum,
+    required this.defaultValue,
+    required this.divisions,
+  });
+
+  final double minimum;
+  final double maximum;
+  final double defaultValue;
+  final int divisions;
 }
 
 class _SummaryValue extends StatelessWidget {
