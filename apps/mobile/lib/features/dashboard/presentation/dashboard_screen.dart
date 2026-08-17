@@ -6,6 +6,7 @@ import '../../meal_tracking/domain/entities/meal_entry.dart';
 import '../../nutrition/domain/services/nutrition_service.dart';
 import '../../profile/data/profile_storage.dart';
 import '../../water_tracking/data/water_storage.dart';
+import '../../weight_tracking/presentation/screens/weight_tracking_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -14,9 +15,14 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
   String? _firstName;
   bool _isLoading = true;
+
+  int _progressRevision = 0;
 
   List<MealEntry> _todayMeals = [];
 
@@ -37,7 +43,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadDashboard();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDashboard() async {
@@ -192,6 +205,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     await _loadDashboard();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _progressRevision++;
+    });
   }
 
   @override
@@ -206,160 +227,189 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.person_outline),
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorSize: TabBarIndicatorSize.label,
+          dividerColor: Colors.transparent,
+          labelStyle: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          tabs: const [
+            Tab(text: 'Today'),
+            Tab(text: 'Progress'),
+          ],
+        ),
       ),
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : RefreshIndicator(
-                onRefresh: _loadDashboard,
-                child: LayoutBuilder(
-                  builder: (context, viewportConstraints) {
-                    final horizontalPadding = viewportConstraints.maxWidth < 370
-                        ? 16.0
-                        : 20.0;
-
-                    return ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(
-                        horizontalPadding,
-                        24,
-                        horizontalPadding,
-                        128,
-                      ),
-                      children: [
-                        Text(
-                          _buildGreeting(),
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-
-                        const SizedBox(height: 4),
-
-                        Text(
-                          'Your health summary',
-                          style: Theme.of(context).textTheme.headlineMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-
-                        if (_goalName.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 300),
-                            child: Text(
-                              'Goal: $_goalName',
-                              key: ValueKey(_goalName),
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 24),
-
-                        _GoalSummaryCard(
-                          title: 'Calories',
-                          consumed: _consumedCalories,
-                          target: _calorieTarget,
-                          unit: 'kcal',
-                          icon: Icons.local_fire_department_outlined,
-                          targetDescription:
-                              'Estimated daily calorie target for your current goal.',
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        _MetricGrid(
-                          protein: _GoalMetricCard(
-                            title: 'Protein',
-                            consumed: _consumedProtein,
-                            target: _proteinTarget,
-                            unit: 'g',
-                            icon: Icons.fitness_center,
-                            metricType: _MetricType.protein,
-                          ),
-                          water: _GoalMetricCard(
-                            title: 'Water',
-                            consumed: _consumedWaterMl,
-                            target: _waterTargetMl,
-                            unit: 'mL',
-                            icon: Icons.water_drop_outlined,
-                            displayAsLitres: true,
-                            metricType: _MetricType.water,
-                            onTap: _openWaterTracking,
-                          ),
-                          carbs: _GoalMetricCard(
-                            title: 'Carbs',
-                            consumed: _consumedCarbs,
-                            target: _carbTarget,
-                            unit: 'g',
-                            icon: Icons.rice_bowl_outlined,
-                            metricType: _MetricType.carbs,
-                          ),
-                          fat: _GoalMetricCard(
-                            title: 'Fat',
-                            consumed: _consumedFat,
-                            target: _fatTarget,
-                            unit: 'g',
-                            icon: Icons.eco_outlined,
-                            metricType: _MetricType.fat,
-                          ),
-                        ),
-
-                        const SizedBox(height: 28),
-
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Today',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            if (_todayMeals.isNotEmpty)
-                              Text(
-                                '${_todayMeals.length} '
-                                '${_todayMeals.length == 1 ? 'meal' : 'meals'}',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        if (_todayMeals.isEmpty)
-                          const _EmptyState()
-                        else
-                          ..._todayMeals.map(
-                            (meal) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _MealCard(
-                                meal: meal,
-                                onTap: () {
-                                  _openEditMeal(meal);
-                                },
-                              ),
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
+            : TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildTodayTab(),
+                  WeightTrackingScreen(
+                    key: ValueKey('progress-$_progressRevision'),
+                    embedded: true,
+                  ),
+                ],
               ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddMeal,
-        icon: const Icon(Icons.add),
-        label: const Text('Add meal'),
-      ),
+    );
+  }
+
+  Widget _buildTodayTab() {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: RefreshIndicator(
+            onRefresh: _loadDashboard,
+            child: LayoutBuilder(
+              builder: (context, viewportConstraints) {
+                final horizontalPadding = viewportConstraints.maxWidth < 370
+                    ? 16.0
+                    : 20.0;
+
+                return ListView(
+                  key: const PageStorageKey<String>('dashboard-today-scroll'),
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    24,
+                    horizontalPadding,
+                    132,
+                  ),
+                  children: [
+                    Text(
+                      _buildGreeting(),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Your health summary',
+                      style: Theme.of(context).textTheme.headlineMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    if (_goalName.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: Text(
+                          'Goal: $_goalName',
+                          key: ValueKey(_goalName),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    _GoalSummaryCard(
+                      title: 'Calories',
+                      consumed: _consumedCalories,
+                      target: _calorieTarget,
+                      unit: 'kcal',
+                      icon: Icons.local_fire_department_outlined,
+                      targetDescription:
+                          'Estimated daily calorie target for your current goal.',
+                    ),
+                    const SizedBox(height: 16),
+                    _MetricGrid(
+                      protein: _GoalMetricCard(
+                        title: 'Protein',
+                        consumed: _consumedProtein,
+                        target: _proteinTarget,
+                        unit: 'g',
+                        icon: Icons.fitness_center,
+                        metricType: _MetricType.protein,
+                      ),
+                      water: _GoalMetricCard(
+                        title: 'Water',
+                        consumed: _consumedWaterMl,
+                        target: _waterTargetMl,
+                        unit: 'mL',
+                        icon: Icons.water_drop_outlined,
+                        displayAsLitres: true,
+                        metricType: _MetricType.water,
+                        onTap: _openWaterTracking,
+                      ),
+                      carbs: _GoalMetricCard(
+                        title: 'Carbs',
+                        consumed: _consumedCarbs,
+                        target: _carbTarget,
+                        unit: 'g',
+                        icon: Icons.rice_bowl_outlined,
+                        metricType: _MetricType.carbs,
+                      ),
+                      fat: _GoalMetricCard(
+                        title: 'Fat',
+                        consumed: _consumedFat,
+                        target: _fatTarget,
+                        unit: 'g',
+                        icon: Icons.eco_outlined,
+                        metricType: _MetricType.fat,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Today',
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        if (_todayMeals.isNotEmpty)
+                          Text(
+                            '${_todayMeals.length} '
+                            '${_todayMeals.length == 1 ? 'meal' : 'meals'}',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (_todayMeals.isEmpty)
+                      const _EmptyState()
+                    else
+                      ..._todayMeals.map(
+                        (meal) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _MealCard(
+                            meal: meal,
+                            onTap: () {
+                              _openEditMeal(meal);
+                            },
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: SafeArea(
+            top: false,
+            child: FloatingActionButton.extended(
+              heroTag: 'dashboard-add-meal',
+              onPressed: _openAddMeal,
+              icon: const Icon(Icons.add),
+              label: const Text('Add meal'),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

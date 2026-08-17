@@ -6,20 +6,27 @@ import '../../data/goal_pace_storage.dart';
 import '../../data/weight_storage.dart';
 import '../../domain/entities/weight_entry.dart';
 import '../../domain/services/goal_pace_service.dart';
+import '../../domain/services/recent_weight_pace_service.dart';
 import '../../domain/services/weight_trend_service.dart';
 import '../widgets/weight_trend_chart.dart';
 
 class WeightTrackingScreen extends StatefulWidget {
-  const WeightTrackingScreen({super.key});
+  const WeightTrackingScreen({super.key, this.embedded = false});
+
+  final bool embedded;
 
   @override
   State<WeightTrackingScreen> createState() => _WeightTrackingScreenState();
 }
 
-class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
+class _WeightTrackingScreenState extends State<WeightTrackingScreen>
+    with AutomaticKeepAliveClientMixin {
   static const WeightTrendService _trendService = WeightTrendService();
 
   static const GoalPaceService _goalPaceService = GoalPaceService();
+
+  static const RecentWeightPaceService _recentPaceService =
+      RecentWeightPaceService();
 
   UserProfile? _profile;
   List<WeightEntry> _entries = [];
@@ -27,6 +34,9 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
   double? _weeklyPaceKg;
 
   bool _isLoading = true;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -287,47 +297,79 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
+    final content = _buildContent();
+
+    if (widget.embedded) {
+      return Stack(
+        children: [
+          Positioned.fill(child: content),
+          if (!_isLoading)
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: SafeArea(
+                top: false,
+                child: FloatingActionButton.extended(
+                  heroTag: 'progress-log-weight',
+                  onPressed: _addWeight,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Log weight'),
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Weight & Progress')),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'weight-screen-log-weight',
         onPressed: _addWeight,
         icon: const Icon(Icons.add),
         label: const Text('Log weight'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.only(bottom: 88),
-              child: RefreshIndicator(
-                onRefresh: _loadData,
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  children: [
-                    _buildProgressCard(),
-                    const SizedBox(height: 16),
-                    _buildGoalProgressCard(),
-                    const SizedBox(height: 16),
-                    _buildGoalPaceCard(),
-                    const SizedBox(height: 16),
-                    _buildTrendCard(),
-                    const SizedBox(height: 16),
-                    _buildChartCard(),
-                    const SizedBox(height: 24),
-                    Text(
-                      'History',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_entries.isEmpty)
-                      _buildEmptyState()
-                    else
-                      ..._entries.reversed.map(_buildEntryTile),
-                  ],
-                ),
-              ),
-            ),
+      body: content,
+    );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView(
+        key: const PageStorageKey<String>('weight-progress-scroll'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, widget.embedded ? 132 : 112),
+        children: [
+          _buildProgressCard(),
+          const SizedBox(height: 16),
+          _buildGoalProgressCard(),
+          const SizedBox(height: 16),
+          _buildGoalPaceCard(),
+          const SizedBox(height: 16),
+          _buildTrendCard(),
+          const SizedBox(height: 16),
+          _buildChartCard(),
+          const SizedBox(height: 24),
+          Text(
+            'History',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          if (_entries.isEmpty)
+            _buildEmptyState()
+          else
+            ..._entries.reversed.map(_buildEntryTile),
+        ],
+      ),
     );
   }
 
@@ -613,47 +655,7 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
     }
 
     if (result.goalDirection == WeightGoalDirection.maintain) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_month_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Goal pace',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Maintenance goal',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'A target date is not needed for a maintenance '
-                'goal. Prana will focus on how closely your trend '
-                'stays around your target weight.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return _buildMaintenancePaceCard(result);
     }
 
     final config = _paceConfig(result.goalDirection);
@@ -670,6 +672,12 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
       goalWeightKg: result.goalWeightKg,
       weeklyPaceKg: pace,
       fromDate: DateTime.now(),
+    );
+
+    final recentPaceResult = _recentPaceService.calculate(
+      goalDirection: result.goalDirection,
+      plannedPaceKgPerWeek: pace,
+      entries: _entries,
     );
 
     return Card(
@@ -818,10 +826,373 @@ class _WeightTrackingScreenState extends State<WeightTrackingScreen> {
                 ),
               ),
             ],
+
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 20),
+
+            _buildRecentPaceSection(recentPaceResult),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildMaintenancePaceCard(WeightTrendResult trendResult) {
+    final recentPaceResult = _recentPaceService.calculate(
+      goalDirection: WeightGoalDirection.maintain,
+      plannedPaceKgPerWeek: null,
+      entries: _entries,
+    );
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.calendar_month_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Goal pace',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Maintenance goal',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'A target date is not needed for a maintenance '
+              'goal. Prana will focus on how closely your trend '
+              'stays around your target weight.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 20),
+            _buildMaintenanceRecentPace(recentPaceResult),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentPaceSection(RecentWeightPaceResult result) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.speed_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Recent pace',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        if (!result.hasReliablePace)
+          _buildRecentPacePending(result)
+        else
+          _buildReliableRecentPace(result),
+      ],
+    );
+  }
+
+  Widget _buildRecentPacePending(RecentWeightPaceResult result) {
+    final requiredDays = _recentPaceService.minimumSpanDays;
+
+    final daysRemaining = (requiredDays - result.measurementSpanDays).clamp(
+      0,
+      requiredDays,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'More data needed',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _SummaryValue(
+                label: 'Measurement days',
+                value: '${result.distinctMeasurementDays}',
+              ),
+            ),
+            Expanded(
+              child: _SummaryValue(
+                label: 'History span',
+                value: '${result.measurementSpanDays} days',
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        _ProgressNotice(
+          icon: Icons.hourglass_empty_outlined,
+          text: daysRemaining > 0
+              ? 'Prana waits for at least $requiredDays days of '
+                    'history before comparing your recent pace with '
+                    'your plan. About $daysRemaining more '
+                    '${daysRemaining == 1 ? 'day' : 'days'} of span '
+                    'are needed.'
+              : 'Prana also needs measurements on at least '
+                    '${_recentPaceService.minimumMeasurementDays} '
+                    'different days before estimating recent pace.',
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Short-term weight changes can be heavily affected by '
+          'normal fluctuations, so Prana avoids turning only a few '
+          'days of measurements into a weekly pace.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReliableRecentPace(RecentWeightPaceResult result) {
+    final recentPace = result.goalDirectedPaceKgPerWeek ?? 0;
+
+    final plannedPace = result.plannedPaceKgPerWeek ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _SummaryValue(
+                label: 'Planned pace',
+                value: '${plannedPace.toStringAsFixed(2)} kg/week',
+              ),
+            ),
+            Expanded(
+              child: _SummaryValue(
+                label: 'Recent pace',
+                value: _recentPaceValueText(result),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        _ProgressMessage(
+          icon: _recentPaceStatusIcon(result.status),
+          title: _recentPaceStatusTitle(result.status),
+          subtitle: _recentPaceStatusSubtitle(
+            result.status,
+            recentPace,
+            plannedPace,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Based on ${result.distinctMeasurementDays} measurement '
+          'days across ${result.measurementSpanDays} days of recent '
+          'history.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Recent pace is informational and does not automatically '
+          'change your nutrition targets or planned pace.',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMaintenanceRecentPace(RecentWeightPaceResult result) {
+    if (!result.hasReliablePace) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.speed_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Recent drift',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _buildRecentPacePending(result),
+        ],
+      );
+    }
+
+    final change = result.actualWeightChangeKgPerWeek ?? 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.speed_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Recent drift',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(
+          _maintenanceDriftText(change),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Based on ${result.distinctMeasurementDays} measurement '
+          'days across ${result.measurementSpanDays} days.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 16),
+        const _ProgressNotice(
+          icon: Icons.info_outline,
+          text:
+              'For a maintenance goal, Prana tracks whether your '
+              'weight is drifting up or down rather than comparing '
+              'you with a planned weekly pace.',
+        ),
+      ],
+    );
+  }
+
+  String _recentPaceValueText(RecentWeightPaceResult result) {
+    final value = result.goalDirectedPaceKgPerWeek;
+
+    if (value == null) {
+      return '--';
+    }
+
+    if (result.status == PaceComparisonStatus.movingAwayFromGoal) {
+      return '${value.abs().toStringAsFixed(2)} kg/week away';
+    }
+
+    return '${value.abs().toStringAsFixed(2)} kg/week';
+  }
+
+  String _recentPaceStatusTitle(PaceComparisonStatus status) {
+    return switch (status) {
+      PaceComparisonStatus.closeToPlan => 'Close to plan',
+      PaceComparisonStatus.slowerThanPlan => 'Slower than plan',
+      PaceComparisonStatus.fasterThanPlan => 'Faster than plan',
+      PaceComparisonStatus.movingAwayFromGoal => 'Moving away from goal',
+      PaceComparisonStatus.insufficientData => 'More data needed',
+      PaceComparisonStatus.notApplicable => 'No pace comparison',
+    };
+  }
+
+  String _recentPaceStatusSubtitle(
+    PaceComparisonStatus status,
+    double recentPace,
+    double plannedPace,
+  ) {
+    return switch (status) {
+      PaceComparisonStatus.closeToPlan =>
+        'Your recent trend is reasonably close to your '
+            'selected weekly pace.',
+
+      PaceComparisonStatus.slowerThanPlan =>
+        'Your recent trend is progressing more slowly than '
+            'your selected ${plannedPace.toStringAsFixed(2)} kg/week pace.',
+
+      PaceComparisonStatus.fasterThanPlan =>
+        'Your recent trend is progressing faster than your '
+            'selected ${plannedPace.toStringAsFixed(2)} kg/week pace.',
+
+      PaceComparisonStatus.movingAwayFromGoal =>
+        'Your recent trend is moving about '
+            '${recentPace.abs().toStringAsFixed(2)} kg/week away '
+            'from your selected goal direction.',
+
+      PaceComparisonStatus.insufficientData =>
+        'Keep logging measurements to build a reliable comparison.',
+
+      PaceComparisonStatus.notApplicable =>
+        'A directional pace comparison is not needed.',
+    };
+  }
+
+  IconData _recentPaceStatusIcon(PaceComparisonStatus status) {
+    return switch (status) {
+      PaceComparisonStatus.closeToPlan => Icons.check_circle_outline,
+
+      PaceComparisonStatus.slowerThanPlan => Icons.trending_down,
+
+      PaceComparisonStatus.fasterThanPlan => Icons.trending_up,
+
+      PaceComparisonStatus.movingAwayFromGoal => Icons.swap_vert,
+
+      PaceComparisonStatus.insufficientData => Icons.hourglass_empty_outlined,
+
+      PaceComparisonStatus.notApplicable => Icons.horizontal_rule,
+    };
+  }
+
+  String _maintenanceDriftText(double weightChangeKgPerWeek) {
+    const stableTolerance = 0.01;
+
+    if (weightChangeKgPerWeek > stableTolerance) {
+      return '${weightChangeKgPerWeek.toStringAsFixed(2)} '
+          'kg/week upward';
+    }
+
+    if (weightChangeKgPerWeek < -stableTolerance) {
+      return '${weightChangeKgPerWeek.abs().toStringAsFixed(2)} '
+          'kg/week downward';
+    }
+
+    return 'Approximately stable';
   }
 
   Widget _buildTrendCard() {

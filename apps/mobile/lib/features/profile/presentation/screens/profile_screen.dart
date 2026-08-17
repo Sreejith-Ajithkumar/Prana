@@ -52,10 +52,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _openWeightProgress() async {
-    await context.push('/weight');
-  }
-
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
@@ -112,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       _ProfileRow(
                         icon: Icons.monitor_weight_outlined,
-                        label: 'Reference weight',
+                        label: 'Starting weight',
                         value: '${_formatNumber(profile.weightKg)} kg',
                       ),
                     ],
@@ -151,29 +147,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 24),
 
-                  Text(
-                    'Progress',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.monitor_weight_outlined),
-                      title: const Text('Weight & Progress'),
-                      subtitle: const Text(
-                        'Track measurements, history, and progress toward your goal.',
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: _openWeightProgress,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -187,7 +160,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
-                              'Changing your profile or goals may update your estimated calorie, macro, and hydration targets.',
+                              'Changing your profile or goals may '
+                              'update your estimated calorie, macro, '
+                              'and hydration targets.',
                             ),
                           ),
                         ],
