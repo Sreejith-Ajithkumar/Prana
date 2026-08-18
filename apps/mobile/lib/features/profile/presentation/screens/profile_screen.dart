@@ -52,6 +52,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _openHealthWearables() async {
+    await context.push('/health');
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
@@ -141,6 +145,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         icon: Icons.directions_run_outlined,
                         label: 'Activity level',
                         value: _formatActivityLevel(profile.activityLevel),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  Text(
+                    'Health & wearables',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _ProfileSection(
+                    children: [
+                      _ProfileNavigationRow(
+                        icon: Icons.health_and_safety_outlined,
+                        label: 'Health connections',
+                        description:
+                            'Manage Health Connect and wearable access.',
+                        onTap: _openHealthWearables,
                       ),
                     ],
                   ),
@@ -302,6 +329,31 @@ class _ProfileRow extends StatelessWidget {
           context,
         ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
       ),
+    );
+  }
+}
+
+class _ProfileNavigationRow extends StatelessWidget {
+  const _ProfileNavigationRow({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(label),
+      subtitle: Text(description),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onTap,
     );
   }
 }

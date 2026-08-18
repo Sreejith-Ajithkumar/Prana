@@ -2,31 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/dashboard/presentation/dashboard_screen.dart';
+import '../features/health/presentation/health_wearables_screen.dart';
 import '../features/onboarding/presentation/controllers/onboarding_controller.dart';
 import '../features/onboarding/presentation/controllers/onboarding_scope.dart';
+import '../features/onboarding/presentation/screens/activity_level_screen.dart';
 import '../features/onboarding/presentation/screens/date_of_birth_screen.dart';
+import '../features/onboarding/presentation/screens/goal_screen.dart';
+import '../features/onboarding/presentation/screens/goal_weight_screen.dart';
+import '../features/onboarding/presentation/screens/height_screen.dart';
 import '../features/onboarding/presentation/screens/name_screen.dart';
 import '../features/onboarding/presentation/screens/onboarding_intro_screen.dart';
-import '../features/onboarding/presentation/screens/sex_screen.dart';
-import '../features/splash/presentation/splash_screen.dart';
-import '../features/onboarding/presentation/screens/height_screen.dart';
-import '../features/onboarding/presentation/screens/weight_screen.dart';
-import '../features/onboarding/presentation/screens/goal_weight_screen.dart';
-import '../features/onboarding/presentation/screens/goal_screen.dart';
-import '../features/onboarding/presentation/screens/activity_level_screen.dart';
 import '../features/onboarding/presentation/screens/review_screen.dart';
+import '../features/onboarding/presentation/screens/sex_screen.dart';
+import '../features/onboarding/presentation/screens/weight_screen.dart';
+import '../features/splash/presentation/splash_screen.dart';
 import '../features/startup/presentation/startup_screen.dart';
 
+import '../features/meal_tracking/domain/entities/meal_entry.dart';
 import '../features/meal_tracking/presentation/screens/add_meal_screen.dart';
 import '../../features/meal_tracking/presentation/screens/food_search_screen.dart';
-import '../features/meal_tracking/domain/entities/meal_entry.dart';
 import '../features/meal_tracking/presentation/screens/edit_meal_screen.dart';
 
-import '../features/water_tracking/presentation/screens/water_tracking_screen.dart';
-import '../features/weight_tracking/presentation/screens/weight_tracking_screen.dart';
+
+import '../features/profile/domain/entities/user_profile.dart';
 import '../features/profile/presentation/screens/edit_profile_screen.dart';
 import '../features/profile/presentation/screens/profile_screen.dart';
-import '../features/profile/domain/entities/user_profile.dart';
+import '../features/water_tracking/presentation/screens/water_tracking_screen.dart';
+import '../features/weight_tracking/presentation/screens/weight_tracking_screen.dart';
 
 final OnboardingController onboardingController = OnboardingController();
 
@@ -131,6 +133,14 @@ final GoRouter appRouter = GoRouter(
         final profile = state.extra! as UserProfile;
 
         return EditProfileScreen(profile: profile);
+      },
+    ),
+
+    GoRoute(
+      path: '/health',
+      name: 'health',
+      builder: (context, state) {
+        return const HealthWearablesScreen();
       },
     ),
 
