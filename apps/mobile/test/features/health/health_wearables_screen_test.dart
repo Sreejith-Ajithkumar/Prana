@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/features/health/domain/entities/health_data_type.dart';
 import 'package:mobile/features/health/domain/repositories/health_data_repository.dart';
+import 'package:mobile/features/health/domain/services/health_weight_sync_service.dart';
 import 'package:mobile/features/health/presentation/health_wearables_screen.dart';
 
 void main() {
@@ -96,6 +97,110 @@ void main() {
 
       expect(find.text('Manage access'), findsNothing);
     });
+
+    testWidgets('shows weight sync action when sync is available', (
+      tester,
+    ) async {
+      final repository = FakeHealthDataRepository(
+        accessStatus: HealthAccessStatus.granted,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthWearablesScreen(
+            repository: repository,
+            weightSyncAction: () async {
+              return const HealthWeightSyncResult(
+                status: HealthWeightSyncStatus.synced,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Weight sync'), findsOneWidget);
+
+      expect(find.text('Sync weight now'), findsOneWidget);
+    });
+
+    testWidgets('shows imported measurement count after weight sync', (
+      tester,
+    ) async {
+      var syncCalls = 0;
+
+      final repository = FakeHealthDataRepository(
+        accessStatus: HealthAccessStatus.granted,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthWearablesScreen(
+            repository: repository,
+            weightSyncAction: () async {
+              syncCalls++;
+
+              return const HealthWeightSyncResult(
+                status: HealthWeightSyncStatus.synced,
+                fetchedCount: 1,
+                importedCount: 1,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final syncButton = find.text('Sync weight now');
+
+      await tester.ensureVisible(syncButton);
+      await tester.tap(syncButton);
+
+      await tester.pumpAndSettle();
+
+      expect(syncCalls, 1);
+
+      expect(find.text('Imported 1 new weight measurement.'), findsOneWidget);
+    });
+
+    testWidgets('shows up to date message when repeated sync has no changes', (
+      tester,
+    ) async {
+      final repository = FakeHealthDataRepository(
+        accessStatus: HealthAccessStatus.granted,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthWearablesScreen(
+            repository: repository,
+            weightSyncAction: () async {
+              return const HealthWeightSyncResult(
+                status: HealthWeightSyncStatus.synced,
+                fetchedCount: 1,
+                skippedCount: 1,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final syncButton = find.text('Sync weight now');
+
+      await tester.ensureVisible(syncButton);
+      await tester.tap(syncButton);
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Weight history is already up to date.'),
+        findsOneWidget,
+      );
+    });
   });
 }
 
@@ -109,6 +214,7 @@ class FakeHealthDataRepository implements HealthDataRepository {
   final bool available;
 
   HealthAccessStatus accessStatus;
+
   final HealthAccessStatus requestedStatus;
 
   int requestAccessCalls = 0;
@@ -139,6 +245,7 @@ class FakeHealthDataRepository implements HealthDataRepository {
   ) async {
     requestAccessCalls++;
     accessStatus = requestedStatus;
+
     return accessStatus;
   }
 
