@@ -14,6 +14,12 @@ abstract interface class HealthPluginClient {
     List<health_plugin.HealthDataType> types, {
     required List<health_plugin.HealthDataAccess> permissions,
   });
+
+  Future<List<health_plugin.HealthDataPoint>> getHealthDataFromTypes({
+    required List<health_plugin.HealthDataType> types,
+    required DateTime startTime,
+    required DateTime endTime,
+  });
 }
 
 class DefaultHealthPluginClient implements HealthPluginClient {
@@ -46,5 +52,18 @@ class DefaultHealthPluginClient implements HealthPluginClient {
     required List<health_plugin.HealthDataAccess> permissions,
   }) {
     return _health.requestAuthorization(types, permissions: permissions);
+  }
+
+  @override
+  Future<List<health_plugin.HealthDataPoint>> getHealthDataFromTypes({
+    required List<health_plugin.HealthDataType> types,
+    required DateTime startTime,
+    required DateTime endTime,
+  }) {
+    return _health.getHealthDataFromTypes(
+      types: types,
+      startTime: startTime,
+      endTime: endTime,
+    );
   }
 }

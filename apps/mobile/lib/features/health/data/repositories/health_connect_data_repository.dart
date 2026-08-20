@@ -1,13 +1,14 @@
 import 'package:health/health.dart' as health_plugin;
 
 import '../../domain/entities/health_data_type.dart';
+import '../../domain/entities/health_weight_sample.dart';
 import '../../domain/repositories/health_data_repository.dart';
 import '../clients/health_plugin_client.dart';
 import '../mappers/health_plugin_type_mapper.dart';
 import '../permissions/activity_recognition_permission.dart';
 import '../settings/health_settings_launcher.dart';
 
-class HealthConnectDataRepository implements HealthDataRepository {
+class HealthConnectDataRepository implements HealthWeightDataRepository {
   HealthConnectDataRepository({
     HealthPluginClient? healthClient,
     this._mapper = const HealthPluginTypeMapper(),
@@ -115,6 +116,65 @@ class HealthConnectDataRepository implements HealthDataRepository {
     );
 
     return getAccessStatus(dataTypes);
+  }
+
+  @override
+  Future<List<HealthWeightSample>> readWeightSamples({
+    required DateTime startTime,
+    required DateTime endTime,
+  }) async {
+    if (!startTime.isBefore(endTime)) {
+      throw ArgumentError('startTime must be before endTime.');
+    }
+
+    await _ensureConfigured();
+
+    final dataPoints = await _healthClient.getHealthDataFromTypes(
+      types: const [health_plugin.HealthDataType.WEIGHT],
+      startTime: startTime,
+      endTime: endTime,
+    );
+
+    final samples = <HealthWeightSample>[];
+
+    for (final point in dataPoints) {
+      if (point.type != health_plugin.HealthDataType.WEIGHT) {
+        continue;
+      }
+
+      final value = point.value;
+
+      if (value is! health_plugin.NumericHealthValue) {
+        continue;
+      }
+
+      final weightKg = value.numericValue.toDouble();
+
+      if (!weightKg.isFinite || weightKg <= 0) {
+        continue;
+      }
+
+      final externalId = point.uuid.trim();
+
+      if (externalId.isEmpty) {
+        continue;
+      }
+
+      final sourceName = point.sourceName.trim();
+
+      samples.add(
+        HealthWeightSample(
+          externalId: externalId,
+          weightKg: weightKg,
+          measuredAt: point.dateFrom,
+          sourceName: sourceName.isEmpty ? null : sourceName,
+        ),
+      );
+    }
+
+    samples.sort((a, b) => a.measuredAt.compareTo(b.measuredAt));
+
+    return samples;
   }
 
   Future<bool> _hasReadAccess(HealthDataType dataType) async {

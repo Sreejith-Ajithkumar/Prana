@@ -3,8 +3,9 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/entities/weight_entry.dart';
+import '../domain/repositories/weight_entry_store.dart';
 
-class WeightStorage {
+class WeightStorage implements WeightEntryStore {
   WeightStorage._();
 
   static final WeightStorage instance = WeightStorage._();
@@ -13,6 +14,7 @@ class WeightStorage {
 
   final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
 
+  @override
   Future<List<WeightEntry>> loadEntries() async {
     final encoded = await _preferences.getString(_weightKey);
 
@@ -46,6 +48,7 @@ class WeightStorage {
     }
   }
 
+  @override
   Future<void> saveEntries(List<WeightEntry> entries) async {
     final sortedEntries = [...entries]
       ..sort((a, b) => a.measuredAt.compareTo(b.measuredAt));

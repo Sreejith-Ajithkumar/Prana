@@ -184,6 +184,15 @@ class FakeHealthPluginClient implements HealthPluginClient {
 
     return grantRequestedTypes;
   }
+
+  @override
+  Future<List<health_plugin.HealthDataPoint>> getHealthDataFromTypes({
+    required List<health_plugin.HealthDataType> types,
+    required DateTime startTime,
+    required DateTime endTime,
+  }) async {
+    return [];
+  }
 }
 
 class FakeActivityRecognitionPermission
