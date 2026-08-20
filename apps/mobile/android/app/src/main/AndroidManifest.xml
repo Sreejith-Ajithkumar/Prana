@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <application
-        android:label="mobile"
+        android:label="Prana"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
