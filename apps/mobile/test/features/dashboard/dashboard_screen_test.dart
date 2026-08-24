@@ -19,7 +19,9 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('shows ready activity summary', (tester) async {
+    testWidgets('shows ready activity summary with connected metrics', (
+      tester,
+    ) async {
       const summary = HealthDailyActivitySummary(
         steps: 7842,
         activeEnergyKcal: 425.6,
@@ -33,6 +35,9 @@ void main() {
           result: const HealthTodayActivityResult(
             status: HealthTodayActivityStatus.ready,
             summary: summary,
+            hasStepsAccess: true,
+            hasActiveEnergyAccess: true,
+            hasWorkoutAccess: true,
           ),
           hasError: false,
         ),
@@ -42,6 +47,8 @@ void main() {
       expect(find.text('426 kcal'), findsOneWidget);
       expect(find.text('1 workout'), findsOneWidget);
       expect(find.text('42 min'), findsOneWidget);
+      expect(find.text('Connected'), findsNWidgets(4));
+      expect(find.text('Not connected'), findsNothing);
       expect(
         find.text(
           'Active energy is informational and does not change your '
@@ -51,7 +58,9 @@ void main() {
       );
     });
 
-    testWidgets('shows empty activity state', (tester) async {
+    testWidgets('shows empty activity state when all access is connected', (
+      tester,
+    ) async {
       const summary = HealthDailyActivitySummary(
         steps: 0,
         activeEnergyKcal: 0,
@@ -65,22 +74,20 @@ void main() {
           result: const HealthTodayActivityResult(
             status: HealthTodayActivityStatus.ready,
             summary: summary,
+            hasStepsAccess: true,
+            hasActiveEnergyAccess: true,
+            hasWorkoutAccess: true,
           ),
           hasError: false,
         ),
       );
 
       expect(find.text('No activity recorded today yet'), findsOneWidget);
-      expect(
-        find.text(
-          'Active energy is informational and does not change your '
-          'nutrition target.',
-        ),
-        findsOneWidget,
-      );
     });
 
-    testWidgets('shows access-needed action', (tester) async {
+    testWidgets('shows manage access action when no activity access exists', (
+      tester,
+    ) async {
       var tapped = false;
 
       await tester.pumpWidget(
@@ -97,9 +104,79 @@ void main() {
       );
 
       expect(find.text('Connect activity data'), findsOneWidget);
-      expect(find.text('Review access'), findsOneWidget);
+      expect(find.text('Manage Health access'), findsOneWidget);
 
-      await tester.tap(find.text('Review access'));
+      await tester.tap(find.text('Manage Health access'));
+      await tester.pump();
+
+      expect(tapped, isTrue);
+    });
+
+    testWidgets('shows connected and disconnected metrics for partial access', (
+      tester,
+    ) async {
+      const summary = HealthDailyActivitySummary(
+        steps: 6400,
+        activeEnergyKcal: 0,
+        workoutCount: 0,
+        workoutDuration: Duration.zero,
+      );
+
+      await tester.pumpWidget(
+        _buildCard(
+          isLoading: false,
+          result: const HealthTodayActivityResult(
+            status: HealthTodayActivityStatus.ready,
+            summary: summary,
+            hasStepsAccess: true,
+            hasActiveEnergyAccess: false,
+            hasWorkoutAccess: false,
+          ),
+          hasError: false,
+        ),
+      );
+
+      expect(find.text('6,400'), findsOneWidget);
+      expect(find.text('Connected'), findsOneWidget);
+      expect(find.text('Not connected'), findsNWidgets(3));
+      expect(
+        find.text(
+          'Some activity permissions are off. Connected metrics '
+          'still update normally.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Manage Health access'), findsOneWidget);
+    });
+
+    testWidgets('partial access manage action is tappable', (tester) async {
+      var tapped = false;
+
+      const summary = HealthDailyActivitySummary(
+        steps: 1200,
+        activeEnergyKcal: 0,
+        workoutCount: 0,
+        workoutDuration: Duration.zero,
+      );
+
+      await tester.pumpWidget(
+        _buildCard(
+          isLoading: false,
+          result: const HealthTodayActivityResult(
+            status: HealthTodayActivityStatus.ready,
+            summary: summary,
+            hasStepsAccess: true,
+            hasActiveEnergyAccess: false,
+            hasWorkoutAccess: false,
+          ),
+          hasError: false,
+          onManageAccess: () {
+            tapped = true;
+          },
+        ),
+      );
+
+      await tester.tap(find.text('Manage Health access'));
       await tester.pump();
 
       expect(tapped, isTrue);
@@ -117,10 +194,6 @@ void main() {
       );
 
       expect(find.text('Health activity unavailable'), findsOneWidget);
-      expect(
-        find.text('Activity data is not available on this device right now.'),
-        findsOneWidget,
-      );
     });
 
     testWidgets('shows retry action after activity load error', (tester) async {

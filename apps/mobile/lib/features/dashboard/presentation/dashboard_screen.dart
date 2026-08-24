@@ -585,9 +585,8 @@ class DashboardActivityCard extends StatelessWidget {
         key: const ValueKey('activity-access-needed'),
         icon: Icons.health_and_safety_outlined,
         title: 'Connect activity data',
-        message:
-            'Review Health Connect access to show steps, active energy, and workouts here.',
-        actionLabel: 'Review access',
+        message: 'Choose which Health Connect activity data Prana can read.',
+        actionLabel: 'Manage Health access',
         onAction: onManageAccess,
       );
     }
@@ -605,7 +604,7 @@ class DashboardActivityCard extends StatelessWidget {
       );
     }
 
-    if (!summary.hasActivity) {
+    if (currentResult.hasFullAccess && !summary.hasActivity) {
       return const _ActivityMessage(
         key: ValueKey('activity-empty'),
         icon: Icons.directions_walk_outlined,
@@ -625,35 +624,45 @@ class DashboardActivityCard extends StatelessWidget {
           builder: (context, constraints) {
             final singleColumn = constraints.maxWidth < 310;
 
+            final metrics = <Widget>[
+              _ActivityMetric(
+                icon: Icons.directions_walk_outlined,
+                label: 'Steps',
+                value: _formatInteger(summary.steps),
+                isConnected: currentResult.hasStepsAccess,
+              ),
+              _ActivityMetric(
+                icon: Icons.local_fire_department_outlined,
+                label: 'Active energy',
+                value: '${summary.activeEnergyKcal.toStringAsFixed(0)} kcal',
+                isConnected: currentResult.hasActiveEnergyAccess,
+              ),
+              _ActivityMetric(
+                icon: Icons.fitness_center_outlined,
+                label: 'Workouts',
+                value:
+                    '${summary.workoutCount} '
+                    '${summary.workoutCount == 1 ? 'workout' : 'workouts'}',
+                isConnected: currentResult.hasWorkoutAccess,
+              ),
+              _ActivityMetric(
+                icon: Icons.timer_outlined,
+                label: 'Workout time',
+                value: _formatDuration(summary.workoutDuration),
+                isConnected: currentResult.hasWorkoutAccess,
+              ),
+            ];
+
             if (singleColumn) {
               return Column(
                 children: [
-                  _ActivityMetric(
-                    icon: Icons.directions_walk_outlined,
-                    label: 'Steps',
-                    value: _formatInteger(summary.steps),
-                  ),
+                  metrics[0],
                   const SizedBox(height: 16),
-                  _ActivityMetric(
-                    icon: Icons.local_fire_department_outlined,
-                    label: 'Active energy',
-                    value:
-                        '${summary.activeEnergyKcal.toStringAsFixed(0)} kcal',
-                  ),
+                  metrics[1],
                   const SizedBox(height: 16),
-                  _ActivityMetric(
-                    icon: Icons.fitness_center_outlined,
-                    label: 'Workouts',
-                    value:
-                        '${summary.workoutCount} '
-                        '${summary.workoutCount == 1 ? 'workout' : 'workouts'}',
-                  ),
+                  metrics[2],
                   const SizedBox(height: 16),
-                  _ActivityMetric(
-                    icon: Icons.timer_outlined,
-                    label: 'Workout time',
-                    value: _formatDuration(summary.workoutDuration),
-                  ),
+                  metrics[3],
                 ],
               );
             }
@@ -662,50 +671,63 @@ class DashboardActivityCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(
-                      child: _ActivityMetric(
-                        icon: Icons.directions_walk_outlined,
-                        label: 'Steps',
-                        value: _formatInteger(summary.steps),
-                      ),
-                    ),
+                    Expanded(child: metrics[0]),
                     const SizedBox(width: 16),
-                    Expanded(
-                      child: _ActivityMetric(
-                        icon: Icons.local_fire_department_outlined,
-                        label: 'Active energy',
-                        value:
-                            '${summary.activeEnergyKcal.toStringAsFixed(0)} kcal',
-                      ),
-                    ),
+                    Expanded(child: metrics[1]),
                   ],
                 ),
                 const SizedBox(height: 18),
                 Row(
                   children: [
-                    Expanded(
-                      child: _ActivityMetric(
-                        icon: Icons.fitness_center_outlined,
-                        label: 'Workouts',
-                        value:
-                            '${summary.workoutCount} '
-                            '${summary.workoutCount == 1 ? 'workout' : 'workouts'}',
-                      ),
-                    ),
+                    Expanded(child: metrics[2]),
                     const SizedBox(width: 16),
-                    Expanded(
-                      child: _ActivityMetric(
-                        icon: Icons.timer_outlined,
-                        label: 'Workout time',
-                        value: _formatDuration(summary.workoutDuration),
-                      ),
-                    ),
+                    Expanded(child: metrics[3]),
                   ],
                 ),
               ],
             );
           },
         ),
+        if (currentResult.hasPartialAccess) ...[
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.health_and_safety_outlined,
+                  size: 20,
+                  color: colors.onSecondaryContainer,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Some activity permissions are off. Connected metrics '
+                    'still update normally.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.tonalIcon(
+              onPressed: onManageAccess,
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text('Manage Health access'),
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         Divider(color: colors.outlineVariant),
         const SizedBox(height: 10),
@@ -767,25 +789,33 @@ class _ActivityMetric extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    required this.isConnected,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final bool isConnected;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    final avatarBackground = isConnected
+        ? colors.secondaryContainer
+        : colors.surfaceContainerHighest;
+
+    final avatarForeground = isConnected
+        ? colors.onSecondaryContainer
+        : colors.onSurfaceVariant;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         CircleAvatar(
           radius: 20,
-          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-          child: Icon(
-            icon,
-            size: 20,
-            color: Theme.of(context).colorScheme.onSecondaryContainer,
-          ),
+          backgroundColor: avatarBackground,
+          child: Icon(icon, size: 20, color: avatarForeground),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -793,18 +823,27 @@ class _ActivityMetric extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                value,
+                isConnected ? value : '—',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: isConnected ? null : colors.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                isConnected ? 'Connected' : 'Not connected',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: isConnected ? colors.primary : colors.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
