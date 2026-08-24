@@ -1,3 +1,4 @@
+import '../entities/health_activity_sample.dart';
 import '../entities/health_data_type.dart';
 import '../repositories/health_data_repository.dart';
 import 'health_daily_activity_summary_service.dart';
@@ -5,12 +6,30 @@ import 'health_daily_activity_summary_service.dart';
 enum HealthTodayActivityStatus { ready, unavailable, accessNeeded }
 
 class HealthTodayActivityResult {
-  const HealthTodayActivityResult({required this.status, this.summary});
+  const HealthTodayActivityResult({
+    required this.status,
+    this.summary,
+    this.hasStepsAccess = false,
+    this.hasActiveEnergyAccess = false,
+    this.hasWorkoutAccess = false,
+  });
 
   final HealthTodayActivityStatus status;
   final HealthDailyActivitySummary? summary;
 
+  final bool hasStepsAccess;
+  final bool hasActiveEnergyAccess;
+  final bool hasWorkoutAccess;
+
   bool get isReady => status == HealthTodayActivityStatus.ready;
+
+  bool get hasAnyAccess =>
+      hasStepsAccess || hasActiveEnergyAccess || hasWorkoutAccess;
+
+  bool get hasFullAccess =>
+      hasStepsAccess && hasActiveEnergyAccess && hasWorkoutAccess;
+
+  bool get hasPartialAccess => hasAnyAccess && !hasFullAccess;
 }
 
 class HealthTodayActivityService {
@@ -37,11 +56,31 @@ class HealthTodayActivityService {
       );
     }
 
-    final accessStatus = await _repository.getAccessStatus(activityDataTypes);
+    final stepsAccess = await _repository.getAccessStatus(const {
+      HealthDataType.steps,
+    });
 
-    if (accessStatus != HealthAccessStatus.granted) {
-      return const HealthTodayActivityResult(
+    final activeEnergyAccess = await _repository.getAccessStatus(const {
+      HealthDataType.activeEnergyBurned,
+    });
+
+    final workoutAccess = await _repository.getAccessStatus(const {
+      HealthDataType.workout,
+    });
+
+    final hasStepsAccess = _isGranted(stepsAccess);
+    final hasActiveEnergyAccess = _isGranted(activeEnergyAccess);
+    final hasWorkoutAccess = _isGranted(workoutAccess);
+
+    final hasAnyAccess =
+        hasStepsAccess || hasActiveEnergyAccess || hasWorkoutAccess;
+
+    if (!hasAnyAccess) {
+      return HealthTodayActivityResult(
         status: HealthTodayActivityStatus.accessNeeded,
+        hasStepsAccess: hasStepsAccess,
+        hasActiveEnergyAccess: hasActiveEnergyAccess,
+        hasWorkoutAccess: hasWorkoutAccess,
       );
     }
 
@@ -51,20 +90,26 @@ class HealthTodayActivityService {
 
     final endTime = DateTime(current.year, current.month, current.day + 1);
 
-    final stepSamples = await _repository.readStepSamples(
-      startTime: startTime,
-      endTime: endTime,
-    );
+    final stepSamples = hasStepsAccess
+        ? await _repository.readStepSamples(
+            startTime: startTime,
+            endTime: endTime,
+          )
+        : const <HealthStepsSample>[];
 
-    final activeEnergySamples = await _repository.readActiveEnergySamples(
-      startTime: startTime,
-      endTime: endTime,
-    );
+    final activeEnergySamples = hasActiveEnergyAccess
+        ? await _repository.readActiveEnergySamples(
+            startTime: startTime,
+            endTime: endTime,
+          )
+        : const <HealthActiveEnergySample>[];
 
-    final workoutSamples = await _repository.readWorkoutSamples(
-      startTime: startTime,
-      endTime: endTime,
-    );
+    final workoutSamples = hasWorkoutAccess
+        ? await _repository.readWorkoutSamples(
+            startTime: startTime,
+            endTime: endTime,
+          )
+        : const <HealthWorkoutSample>[];
 
     final summary = summaryService.summarize(
       stepSamples: stepSamples,
@@ -75,6 +120,13 @@ class HealthTodayActivityService {
     return HealthTodayActivityResult(
       status: HealthTodayActivityStatus.ready,
       summary: summary,
+      hasStepsAccess: hasStepsAccess,
+      hasActiveEnergyAccess: hasActiveEnergyAccess,
+      hasWorkoutAccess: hasWorkoutAccess,
     );
+  }
+
+  bool _isGranted(HealthAccessStatus status) {
+    return status == HealthAccessStatus.granted;
   }
 }

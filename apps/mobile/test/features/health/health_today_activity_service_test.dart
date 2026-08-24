@@ -20,14 +20,19 @@ void main() {
       final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
 
       expect(result.status, HealthTodayActivityStatus.unavailable);
-
       expect(result.summary, isNull);
+      expect(result.hasAnyAccess, isFalse);
+      expect(repository.permissionCheckCount, 0);
       expect(repository.readCount, 0);
     });
 
-    test('returns access needed when access is denied', () async {
+    test('returns access needed when no activity access is granted', () async {
       final repository = FakeHealthActivityDataRepository(
-        accessStatus: HealthAccessStatus.denied,
+        accessByType: const {
+          HealthDataType.steps: HealthAccessStatus.denied,
+          HealthDataType.activeEnergyBurned: HealthAccessStatus.denied,
+          HealthDataType.workout: HealthAccessStatus.denied,
+        },
       );
 
       final service = HealthTodayActivityService(repository);
@@ -35,27 +40,93 @@ void main() {
       final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
 
       expect(result.status, HealthTodayActivityStatus.accessNeeded);
-
       expect(result.summary, isNull);
+      expect(result.hasAnyAccess, isFalse);
+      expect(result.hasFullAccess, isFalse);
+      expect(result.hasPartialAccess, isFalse);
+      expect(repository.permissionCheckCount, 3);
       expect(repository.readCount, 0);
     });
 
-    test('returns access needed when access is partial', () async {
+    test(
+      'keeps steps available when other activity access is denied',
+      () async {
+        final repository = FakeHealthActivityDataRepository(
+          accessByType: const {
+            HealthDataType.steps: HealthAccessStatus.granted,
+            HealthDataType.activeEnergyBurned: HealthAccessStatus.denied,
+            HealthDataType.workout: HealthAccessStatus.denied,
+          },
+          stepSamples: [
+            HealthStepsSample(
+              externalId: 'steps-1',
+              steps: 6400,
+              startTime: DateTime(2026, 8, 23, 8),
+              endTime: DateTime(2026, 8, 23, 17),
+            ),
+          ],
+        );
+
+        final service = HealthTodayActivityService(repository);
+
+        final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
+
+        expect(result.status, HealthTodayActivityStatus.ready);
+        expect(result.summary, isNotNull);
+        expect(result.summary!.steps, 6400);
+        expect(result.summary!.activeEnergyKcal, 0);
+        expect(result.summary!.workoutCount, 0);
+
+        expect(result.hasStepsAccess, isTrue);
+        expect(result.hasActiveEnergyAccess, isFalse);
+        expect(result.hasWorkoutAccess, isFalse);
+        expect(result.hasPartialAccess, isTrue);
+        expect(result.hasFullAccess, isFalse);
+
+        expect(repository.stepReadCount, 1);
+        expect(repository.activeEnergyReadCount, 0);
+        expect(repository.workoutReadCount, 0);
+      },
+    );
+
+    test('keeps active energy available when other access is denied', () async {
       final repository = FakeHealthActivityDataRepository(
-        accessStatus: HealthAccessStatus.partiallyGranted,
+        accessByType: const {
+          HealthDataType.steps: HealthAccessStatus.denied,
+          HealthDataType.activeEnergyBurned: HealthAccessStatus.granted,
+          HealthDataType.workout: HealthAccessStatus.denied,
+        },
+        activeEnergySamples: [
+          HealthActiveEnergySample(
+            externalId: 'energy-1',
+            kilocalories: 315.5,
+            startTime: DateTime(2026, 8, 23, 8),
+            endTime: DateTime(2026, 8, 23, 17),
+          ),
+        ],
       );
 
       final service = HealthTodayActivityService(repository);
 
       final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
 
-      expect(result.status, HealthTodayActivityStatus.accessNeeded);
+      expect(result.status, HealthTodayActivityStatus.ready);
+      expect(result.summary, isNotNull);
+      expect(result.summary!.steps, 0);
+      expect(result.summary!.activeEnergyKcal, 315.5);
+      expect(result.summary!.workoutCount, 0);
 
-      expect(result.summary, isNull);
-      expect(repository.readCount, 0);
+      expect(result.hasStepsAccess, isFalse);
+      expect(result.hasActiveEnergyAccess, isTrue);
+      expect(result.hasWorkoutAccess, isFalse);
+      expect(result.hasPartialAccess, isTrue);
+
+      expect(repository.stepReadCount, 0);
+      expect(repository.activeEnergyReadCount, 1);
+      expect(repository.workoutReadCount, 0);
     });
 
-    test('reads and summarizes today activity', () async {
+    test('reads and summarizes all granted activity data', () async {
       final repository = FakeHealthActivityDataRepository(
         stepSamples: [
           HealthStepsSample(
@@ -96,7 +167,28 @@ void main() {
       expect(result.summary!.workoutCount, 1);
       expect(result.summary!.workoutDuration, const Duration(minutes: 40));
 
+      expect(result.hasFullAccess, isTrue);
+      expect(result.hasPartialAccess, isFalse);
+      expect(repository.permissionCheckCount, 3);
       expect(repository.readCount, 3);
+    });
+
+    test('treats singleton partial permission status as not granted', () async {
+      final repository = FakeHealthActivityDataRepository(
+        accessByType: const {
+          HealthDataType.steps: HealthAccessStatus.partiallyGranted,
+          HealthDataType.activeEnergyBurned: HealthAccessStatus.denied,
+          HealthDataType.workout: HealthAccessStatus.denied,
+        },
+      );
+
+      final service = HealthTodayActivityService(repository);
+
+      final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
+
+      expect(result.status, HealthTodayActivityStatus.accessNeeded);
+      expect(result.hasStepsAccess, isFalse);
+      expect(repository.readCount, 0);
     });
 
     test('uses local calendar day as read range', () async {
@@ -119,20 +211,29 @@ class FakeHealthActivityDataRepository implements HealthActivityDataRepository {
       platform: HealthPlatform.healthConnect,
       isAvailable: true,
     ),
-    this.accessStatus = HealthAccessStatus.granted,
+    this.accessByType = const {
+      HealthDataType.steps: HealthAccessStatus.granted,
+      HealthDataType.activeEnergyBurned: HealthAccessStatus.granted,
+      HealthDataType.workout: HealthAccessStatus.granted,
+    },
     this.stepSamples = const [],
     this.activeEnergySamples = const [],
     this.workoutSamples = const [],
   });
 
   final HealthAvailability availability;
-  final HealthAccessStatus accessStatus;
+  final Map<HealthDataType, HealthAccessStatus> accessByType;
 
   final List<HealthStepsSample> stepSamples;
   final List<HealthActiveEnergySample> activeEnergySamples;
   final List<HealthWorkoutSample> workoutSamples;
 
-  int readCount = 0;
+  int permissionCheckCount = 0;
+  int stepReadCount = 0;
+  int activeEnergyReadCount = 0;
+  int workoutReadCount = 0;
+
+  int get readCount => stepReadCount + activeEnergyReadCount + workoutReadCount;
 
   DateTime? lastStartTime;
   DateTime? lastEndTime;
@@ -146,14 +247,40 @@ class FakeHealthActivityDataRepository implements HealthActivityDataRepository {
   Future<HealthAccessStatus> getAccessStatus(
     Set<HealthDataType> dataTypes,
   ) async {
-    return accessStatus;
+    permissionCheckCount++;
+
+    if (dataTypes.isEmpty) {
+      return HealthAccessStatus.granted;
+    }
+
+    final statuses = dataTypes
+        .map((type) => accessByType[type] ?? HealthAccessStatus.denied)
+        .toList(growable: false);
+
+    final grantedCount = statuses
+        .where((status) => status == HealthAccessStatus.granted)
+        .length;
+
+    if (grantedCount == statuses.length) {
+      return HealthAccessStatus.granted;
+    }
+
+    if (grantedCount > 0) {
+      return HealthAccessStatus.partiallyGranted;
+    }
+
+    if (statuses.any((status) => status == HealthAccessStatus.unavailable)) {
+      return HealthAccessStatus.unavailable;
+    }
+
+    return statuses.first;
   }
 
   @override
   Future<HealthAccessStatus> requestAccess(
     Set<HealthDataType> dataTypes,
   ) async {
-    return accessStatus;
+    return getAccessStatus(dataTypes);
   }
 
   @override
@@ -164,7 +291,8 @@ class FakeHealthActivityDataRepository implements HealthActivityDataRepository {
     required DateTime startTime,
     required DateTime endTime,
   }) async {
-    _recordRead(startTime, endTime);
+    stepReadCount++;
+    _recordRange(startTime, endTime);
 
     return stepSamples;
   }
@@ -174,7 +302,8 @@ class FakeHealthActivityDataRepository implements HealthActivityDataRepository {
     required DateTime startTime,
     required DateTime endTime,
   }) async {
-    _recordRead(startTime, endTime);
+    activeEnergyReadCount++;
+    _recordRange(startTime, endTime);
 
     return activeEnergySamples;
   }
@@ -184,13 +313,13 @@ class FakeHealthActivityDataRepository implements HealthActivityDataRepository {
     required DateTime startTime,
     required DateTime endTime,
   }) async {
-    _recordRead(startTime, endTime);
+    workoutReadCount++;
+    _recordRange(startTime, endTime);
 
     return workoutSamples;
   }
 
-  void _recordRead(DateTime startTime, DateTime endTime) {
-    readCount++;
+  void _recordRange(DateTime startTime, DateTime endTime) {
     lastStartTime = startTime;
     lastEndTime = endTime;
   }
