@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../health/data/repositories/health_connect_data_repository.dart';
+import '../../health/domain/services/health_today_activity_service.dart';
 import '../../meal_tracking/data/meal_storage.dart';
 import '../../meal_tracking/domain/entities/meal_entry.dart';
 import '../../nutrition/domain/services/nutrition_service.dart';
@@ -8,8 +11,13 @@ import '../../profile/data/profile_storage.dart';
 import '../../water_tracking/data/water_storage.dart';
 import '../../weight_tracking/presentation/screens/weight_tracking_screen.dart';
 
+typedef HealthTodayActivityLoader =
+    Future<HealthTodayActivityResult> Function();
+
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.activityLoader});
+
+  final HealthTodayActivityLoader? activityLoader;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -18,9 +26,14 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  late final HealthTodayActivityLoader _activityLoader;
 
   String? _firstName;
   bool _isLoading = true;
+  bool _isActivityLoading = true;
+  bool _activityLoadFailed = false;
+
+  HealthTodayActivityResult? _activityResult;
 
   int _progressRevision = 0;
 
@@ -44,13 +57,70 @@ class _DashboardScreenState extends State<DashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _activityLoader = widget.activityLoader ?? _createDefaultActivityLoader();
     _loadDashboard();
+    _loadActivity();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  HealthTodayActivityLoader _createDefaultActivityLoader() {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return () async {
+        return const HealthTodayActivityResult(
+          status: HealthTodayActivityStatus.unavailable,
+        );
+      };
+    }
+
+    final repository = HealthConnectDataRepository();
+    final service = HealthTodayActivityService(repository);
+
+    return () => service.load();
+  }
+
+  Future<void> _loadActivity() async {
+    if (mounted) {
+      setState(() {
+        _isActivityLoading = true;
+        _activityLoadFailed = false;
+      });
+    }
+
+    try {
+      final result = await _activityLoader();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _activityResult = result;
+        _isActivityLoading = false;
+        _activityLoadFailed = false;
+      });
+    } catch (error, stackTrace) {
+      debugPrint('DASHBOARD ACTIVITY ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _activityResult = null;
+        _isActivityLoading = false;
+        _activityLoadFailed = true;
+      });
+    }
+  }
+
+  Future<void> _refreshToday() async {
+    await Future.wait([_loadDashboard(), _loadActivity()]);
   }
 
   Future<void> _loadDashboard() async {
@@ -197,6 +267,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  Future<void> _openHealthConnections() async {
+    await context.push('/health');
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadActivity();
+  }
+
   Future<void> _openProfile() async {
     await context.push('/profile');
 
@@ -204,7 +284,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       return;
     }
 
-    await _loadDashboard();
+    await Future.wait([_loadDashboard(), _loadActivity()]);
 
     if (!mounted) {
       return;
@@ -262,7 +342,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       children: [
         Positioned.fill(
           child: RefreshIndicator(
-            onRefresh: _loadDashboard,
+            onRefresh: _refreshToday,
             child: LayoutBuilder(
               builder: (context, viewportConstraints) {
                 final horizontalPadding = viewportConstraints.maxWidth < 370
@@ -353,6 +433,21 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                     ),
                     const SizedBox(height: 28),
+                    Text(
+                      'Activity today',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DashboardActivityCard(
+                      isLoading: _isActivityLoading,
+                      result: _activityResult,
+                      hasError: _activityLoadFailed,
+                      onManageAccess: _openHealthConnections,
+                      onRetry: _loadActivity,
+                    ),
+                    const SizedBox(height: 28),
                     Row(
                       children: [
                         Expanded(
@@ -409,6 +504,385 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+class DashboardActivityCard extends StatelessWidget {
+  const DashboardActivityCard({
+    required this.isLoading,
+    required this.result,
+    required this.hasError,
+    required this.onManageAccess,
+    required this.onRetry,
+    super.key,
+  });
+
+  final bool isLoading;
+  final HealthTodayActivityResult? result;
+  final bool hasError;
+  final VoidCallback onManageAccess;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _buildContent(context, colors),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, ColorScheme colors) {
+    if (isLoading) {
+      return const Row(
+        key: ValueKey('activity-loading'),
+        children: [
+          SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+          SizedBox(width: 14),
+          Expanded(child: Text('Loading activity from Health Connect...')),
+        ],
+      );
+    }
+
+    if (hasError) {
+      return _ActivityMessage(
+        key: const ValueKey('activity-error'),
+        icon: Icons.sync_problem_outlined,
+        title: 'Activity could not be refreshed',
+        message:
+            'Your nutrition targets are unchanged. Try activity sync again.',
+        actionLabel: 'Retry',
+        onAction: onRetry,
+      );
+    }
+
+    final currentResult = result;
+
+    if (currentResult == null ||
+        currentResult.status == HealthTodayActivityStatus.unavailable) {
+      return const _ActivityMessage(
+        key: ValueKey('activity-unavailable'),
+        icon: Icons.watch_off_outlined,
+        title: 'Health activity unavailable',
+        message: 'Activity data is not available on this device right now.',
+      );
+    }
+
+    if (currentResult.status == HealthTodayActivityStatus.accessNeeded) {
+      return _ActivityMessage(
+        key: const ValueKey('activity-access-needed'),
+        icon: Icons.health_and_safety_outlined,
+        title: 'Connect activity data',
+        message:
+            'Review Health Connect access to show steps, active energy, and workouts here.',
+        actionLabel: 'Review access',
+        onAction: onManageAccess,
+      );
+    }
+
+    final summary = currentResult.summary;
+
+    if (summary == null) {
+      return _ActivityMessage(
+        key: const ValueKey('activity-missing-summary'),
+        icon: Icons.sync_problem_outlined,
+        title: 'Activity could not be refreshed',
+        message: 'Try activity sync again.',
+        actionLabel: 'Retry',
+        onAction: onRetry,
+      );
+    }
+
+    if (!summary.hasActivity) {
+      return const _ActivityMessage(
+        key: ValueKey('activity-empty'),
+        icon: Icons.directions_walk_outlined,
+        title: 'No activity recorded today yet',
+        message:
+            'When Health Connect has activity data, your daily summary will appear here.',
+        footer:
+            'Active energy is informational and does not change your nutrition target.',
+      );
+    }
+
+    return Column(
+      key: const ValueKey('activity-ready'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final singleColumn = constraints.maxWidth < 310;
+
+            if (singleColumn) {
+              return Column(
+                children: [
+                  _ActivityMetric(
+                    icon: Icons.directions_walk_outlined,
+                    label: 'Steps',
+                    value: _formatInteger(summary.steps),
+                  ),
+                  const SizedBox(height: 16),
+                  _ActivityMetric(
+                    icon: Icons.local_fire_department_outlined,
+                    label: 'Active energy',
+                    value:
+                        '${summary.activeEnergyKcal.toStringAsFixed(0)} kcal',
+                  ),
+                  const SizedBox(height: 16),
+                  _ActivityMetric(
+                    icon: Icons.fitness_center_outlined,
+                    label: 'Workouts',
+                    value:
+                        '${summary.workoutCount} '
+                        '${summary.workoutCount == 1 ? 'workout' : 'workouts'}',
+                  ),
+                  const SizedBox(height: 16),
+                  _ActivityMetric(
+                    icon: Icons.timer_outlined,
+                    label: 'Workout time',
+                    value: _formatDuration(summary.workoutDuration),
+                  ),
+                ],
+              );
+            }
+
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ActivityMetric(
+                        icon: Icons.directions_walk_outlined,
+                        label: 'Steps',
+                        value: _formatInteger(summary.steps),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _ActivityMetric(
+                        icon: Icons.local_fire_department_outlined,
+                        label: 'Active energy',
+                        value:
+                            '${summary.activeEnergyKcal.toStringAsFixed(0)} kcal',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ActivityMetric(
+                        icon: Icons.fitness_center_outlined,
+                        label: 'Workouts',
+                        value:
+                            '${summary.workoutCount} '
+                            '${summary.workoutCount == 1 ? 'workout' : 'workouts'}',
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _ActivityMetric(
+                        icon: Icons.timer_outlined,
+                        label: 'Workout time',
+                        value: _formatDuration(summary.workoutDuration),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 18),
+        Divider(color: colors.outlineVariant),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline, size: 18, color: colors.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Active energy is informational and does not change your '
+                'nutrition target.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static String _formatInteger(int value) {
+    final digits = value.abs().toString();
+    final buffer = StringBuffer();
+
+    for (var index = 0; index < digits.length; index++) {
+      if (index > 0 && (digits.length - index) % 3 == 0) {
+        buffer.write(',');
+      }
+
+      buffer.write(digits[index]);
+    }
+
+    return value < 0 ? '-$buffer' : buffer.toString();
+  }
+
+  static String _formatDuration(Duration duration) {
+    final totalMinutes = duration.inMinutes;
+
+    if (totalMinutes < 60) {
+      return '$totalMinutes min';
+    }
+
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+
+    if (minutes == 0) {
+      return '$hours hr';
+    }
+
+    return '$hours hr $minutes min';
+  }
+}
+
+class _ActivityMetric extends StatelessWidget {
+  const _ActivityMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: 20,
+          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+          child: Icon(
+            icon,
+            size: 20,
+            color: Theme.of(context).colorScheme.onSecondaryContainer,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActivityMessage extends StatelessWidget {
+  const _ActivityMessage({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+    this.footer,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final String? footer;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              backgroundColor: colors.secondaryContainer,
+              child: Icon(icon, color: colors.onSecondaryContainer),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (actionLabel != null && onAction != null) ...[
+          const SizedBox(height: 16),
+          FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)),
+        ],
+        if (footer != null) ...[
+          const SizedBox(height: 16),
+          Text(
+            footer!,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+          ),
+        ],
       ],
     );
   }
