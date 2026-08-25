@@ -20,6 +20,7 @@ void main() {
       final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
 
       expect(result.status, HealthTodayActivityStatus.unavailable);
+      expect(result.platform, HealthPlatform.healthConnect);
       expect(result.summary, isNull);
       expect(result.hasAnyAccess, isFalse);
       expect(repository.permissionCheckCount, 0);
@@ -40,6 +41,7 @@ void main() {
       final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
 
       expect(result.status, HealthTodayActivityStatus.accessNeeded);
+      expect(result.platform, HealthPlatform.healthConnect);
       expect(result.summary, isNull);
       expect(result.hasAnyAccess, isFalse);
       expect(result.hasFullAccess, isFalse);
@@ -72,6 +74,7 @@ void main() {
         final result = await service.load(now: DateTime(2026, 8, 23, 15, 30));
 
         expect(result.status, HealthTodayActivityStatus.ready);
+        expect(result.platform, HealthPlatform.healthConnect);
         expect(result.summary, isNotNull);
         expect(result.summary!.steps, 6400);
         expect(result.summary!.activeEnergyKcal, 0);
@@ -161,6 +164,7 @@ void main() {
       expect(result.status, HealthTodayActivityStatus.ready);
 
       expect(result.isReady, isTrue);
+      expect(result.platform, HealthPlatform.healthConnect);
       expect(result.summary, isNotNull);
       expect(result.summary!.steps, 7200);
       expect(result.summary!.activeEnergyKcal, 412.5);
@@ -202,6 +206,68 @@ void main() {
 
       expect(repository.lastEndTime, DateTime(2026, 8, 24));
     });
+
+    test(
+      'attempts Apple Health reads after authorization is reviewed',
+      () async {
+        final repository = FakeHealthActivityDataRepository(
+          availability: const HealthAvailability(
+            platform: HealthPlatform.appleHealth,
+            isAvailable: true,
+          ),
+          accessByType: const {
+            HealthDataType.steps: HealthAccessStatus.unknown,
+            HealthDataType.activeEnergyBurned: HealthAccessStatus.unknown,
+            HealthDataType.workout: HealthAccessStatus.unknown,
+          },
+          stepSamples: [
+            HealthStepsSample(
+              externalId: 'apple-steps',
+              steps: 5100,
+              startTime: DateTime(2026, 8, 23, 8),
+              endTime: DateTime(2026, 8, 23, 17),
+            ),
+          ],
+        );
+
+        final service = HealthTodayActivityService(repository);
+
+        final result = await service.load(now: DateTime(2026, 8, 23, 18));
+
+        expect(result.status, HealthTodayActivityStatus.ready);
+        expect(result.platform, HealthPlatform.appleHealth);
+        expect(result.usesPrivateReadAuthorizationSemantics, isTrue);
+        expect(result.summary!.steps, 5100);
+        expect(result.hasFullAccess, isTrue);
+        expect(repository.readCount, 3);
+      },
+    );
+
+    test(
+      'does not read Apple Health before authorization is requested',
+      () async {
+        final repository = FakeHealthActivityDataRepository(
+          availability: const HealthAvailability(
+            platform: HealthPlatform.appleHealth,
+            isAvailable: true,
+          ),
+          accessByType: const {
+            HealthDataType.steps: HealthAccessStatus.notRequested,
+            HealthDataType.activeEnergyBurned: HealthAccessStatus.notRequested,
+            HealthDataType.workout: HealthAccessStatus.notRequested,
+          },
+        );
+
+        final service = HealthTodayActivityService(repository);
+
+        final result = await service.load(now: DateTime(2026, 8, 23, 18));
+
+        expect(result.status, HealthTodayActivityStatus.accessNeeded);
+        expect(result.platform, HealthPlatform.appleHealth);
+        expect(result.hasAnyAccess, isFalse);
+        expect(repository.readCount, 0);
+      },
+    );
   });
 }
 

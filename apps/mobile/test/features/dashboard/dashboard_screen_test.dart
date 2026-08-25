@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/features/dashboard/presentation/dashboard_screen.dart';
+import 'package:mobile/features/health/domain/entities/health_data_type.dart';
 import 'package:mobile/features/health/domain/services/health_daily_activity_summary_service.dart';
 import 'package:mobile/features/health/domain/services/health_today_activity_service.dart';
 
@@ -12,14 +13,11 @@ void main() {
         _buildCard(isLoading: true, result: null, hasError: false),
       );
 
-      expect(
-        find.text('Loading activity from Health Connect...'),
-        findsOneWidget,
-      );
+      expect(find.text('Loading health activity...'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('shows ready activity summary with connected metrics', (
+    testWidgets('shows Health Connect activity with connected metrics', (
       tester,
     ) async {
       const summary = HealthDailyActivitySummary(
@@ -34,6 +32,7 @@ void main() {
           isLoading: false,
           result: const HealthTodayActivityResult(
             status: HealthTodayActivityStatus.ready,
+            platform: HealthPlatform.healthConnect,
             summary: summary,
             hasStepsAccess: true,
             hasActiveEnergyAccess: true,
@@ -58,9 +57,7 @@ void main() {
       );
     });
 
-    testWidgets('shows empty activity state when all access is connected', (
-      tester,
-    ) async {
+    testWidgets('shows empty Health Connect activity state', (tester) async {
       const summary = HealthDailyActivitySummary(
         steps: 0,
         activeEnergyKcal: 0,
@@ -73,6 +70,7 @@ void main() {
           isLoading: false,
           result: const HealthTodayActivityResult(
             status: HealthTodayActivityStatus.ready,
+            platform: HealthPlatform.healthConnect,
             summary: summary,
             hasStepsAccess: true,
             hasActiveEnergyAccess: true,
@@ -83,36 +81,42 @@ void main() {
       );
 
       expect(find.text('No activity recorded today yet'), findsOneWidget);
-    });
-
-    testWidgets('shows manage access action when no activity access exists', (
-      tester,
-    ) async {
-      var tapped = false;
-
-      await tester.pumpWidget(
-        _buildCard(
-          isLoading: false,
-          result: const HealthTodayActivityResult(
-            status: HealthTodayActivityStatus.accessNeeded,
-          ),
-          hasError: false,
-          onManageAccess: () {
-            tapped = true;
-          },
-        ),
+      expect(
+        find.textContaining('When Health Connect has activity data'),
+        findsOneWidget,
       );
-
-      expect(find.text('Connect activity data'), findsOneWidget);
-      expect(find.text('Manage Health access'), findsOneWidget);
-
-      await tester.tap(find.text('Manage Health access'));
-      await tester.pump();
-
-      expect(tapped, isTrue);
     });
 
-    testWidgets('shows connected and disconnected metrics for partial access', (
+    testWidgets(
+      'shows manage access action when Health Connect access is absent',
+      (tester) async {
+        var tapped = false;
+
+        await tester.pumpWidget(
+          _buildCard(
+            isLoading: false,
+            result: const HealthTodayActivityResult(
+              status: HealthTodayActivityStatus.accessNeeded,
+              platform: HealthPlatform.healthConnect,
+            ),
+            hasError: false,
+            onManageAccess: () {
+              tapped = true;
+            },
+          ),
+        );
+
+        expect(find.text('Connect activity data'), findsOneWidget);
+        expect(find.text('Manage Health access'), findsOneWidget);
+
+        await tester.tap(find.text('Manage Health access'));
+        await tester.pump();
+
+        expect(tapped, isTrue);
+      },
+    );
+
+    testWidgets('shows connected and disconnected Health Connect metrics', (
       tester,
     ) async {
       const summary = HealthDailyActivitySummary(
@@ -127,6 +131,7 @@ void main() {
           isLoading: false,
           result: const HealthTodayActivityResult(
             status: HealthTodayActivityStatus.ready,
+            platform: HealthPlatform.healthConnect,
             summary: summary,
             hasStepsAccess: true,
             hasActiveEnergyAccess: false,
@@ -149,7 +154,9 @@ void main() {
       expect(find.text('Manage Health access'), findsOneWidget);
     });
 
-    testWidgets('partial access manage action is tappable', (tester) async {
+    testWidgets('partial Health Connect manage action is tappable', (
+      tester,
+    ) async {
       var tapped = false;
 
       const summary = HealthDailyActivitySummary(
@@ -164,6 +171,7 @@ void main() {
           isLoading: false,
           result: const HealthTodayActivityResult(
             status: HealthTodayActivityStatus.ready,
+            platform: HealthPlatform.healthConnect,
             summary: summary,
             hasStepsAccess: true,
             hasActiveEnergyAccess: false,
@@ -182,12 +190,83 @@ void main() {
       expect(tapped, isTrue);
     });
 
+    testWidgets(
+      'shows Apple Health authorization wording before access review',
+      (tester) async {
+        var tapped = false;
+
+        await tester.pumpWidget(
+          _buildCard(
+            isLoading: false,
+            result: const HealthTodayActivityResult(
+              status: HealthTodayActivityStatus.accessNeeded,
+              platform: HealthPlatform.appleHealth,
+            ),
+            hasError: false,
+            onManageAccess: () {
+              tapped = true;
+            },
+          ),
+        );
+
+        expect(find.text('Connect Apple Health'), findsOneWidget);
+        expect(find.text('Review Apple Health access'), findsOneWidget);
+        expect(
+          find.textContaining('individual read choices private'),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.text('Review Apple Health access'));
+        await tester.pump();
+
+        expect(tapped, isTrue);
+      },
+    );
+
+    testWidgets('shows Apple Health values without false connected claims', (
+      tester,
+    ) async {
+      const summary = HealthDailyActivitySummary(
+        steps: 5234,
+        activeEnergyKcal: 301.2,
+        workoutCount: 1,
+        workoutDuration: Duration(minutes: 35),
+      );
+
+      await tester.pumpWidget(
+        _buildCard(
+          isLoading: false,
+          result: const HealthTodayActivityResult(
+            status: HealthTodayActivityStatus.ready,
+            platform: HealthPlatform.appleHealth,
+            summary: summary,
+            hasStepsAccess: true,
+            hasActiveEnergyAccess: true,
+            hasWorkoutAccess: true,
+          ),
+          hasError: false,
+        ),
+      );
+
+      expect(find.text('5,234'), findsOneWidget);
+      expect(find.text('301 kcal'), findsOneWidget);
+      expect(find.text('1 workout'), findsOneWidget);
+      expect(find.text('35 min'), findsOneWidget);
+      expect(find.text('Connected'), findsNothing);
+      expect(find.text('Not connected'), findsNothing);
+      expect(
+        find.textContaining('individual read permissions private'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('shows unavailable state', (tester) async {
       await tester.pumpWidget(
         _buildCard(
           isLoading: false,
           result: const HealthTodayActivityResult(
             status: HealthTodayActivityStatus.unavailable,
+            platform: HealthPlatform.unsupported,
           ),
           hasError: false,
         ),

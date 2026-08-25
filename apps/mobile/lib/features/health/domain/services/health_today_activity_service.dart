@@ -8,6 +8,7 @@ enum HealthTodayActivityStatus { ready, unavailable, accessNeeded }
 class HealthTodayActivityResult {
   const HealthTodayActivityResult({
     required this.status,
+    this.platform = HealthPlatform.unsupported,
     this.summary,
     this.hasStepsAccess = false,
     this.hasActiveEnergyAccess = false,
@@ -15,6 +16,7 @@ class HealthTodayActivityResult {
   });
 
   final HealthTodayActivityStatus status;
+  final HealthPlatform platform;
   final HealthDailyActivitySummary? summary;
 
   final bool hasStepsAccess;
@@ -30,6 +32,9 @@ class HealthTodayActivityResult {
       hasStepsAccess && hasActiveEnergyAccess && hasWorkoutAccess;
 
   bool get hasPartialAccess => hasAnyAccess && !hasFullAccess;
+
+  bool get usesPrivateReadAuthorizationSemantics =>
+      platform == HealthPlatform.appleHealth;
 }
 
 class HealthTodayActivityService {
@@ -51,8 +56,9 @@ class HealthTodayActivityService {
     final availability = await _repository.checkAvailability();
 
     if (!availability.isAvailable) {
-      return const HealthTodayActivityResult(
+      return HealthTodayActivityResult(
         status: HealthTodayActivityStatus.unavailable,
+        platform: availability.platform,
       );
     }
 
@@ -68,9 +74,20 @@ class HealthTodayActivityService {
       HealthDataType.workout,
     });
 
-    final hasStepsAccess = _isGranted(stepsAccess);
-    final hasActiveEnergyAccess = _isGranted(activeEnergyAccess);
-    final hasWorkoutAccess = _isGranted(workoutAccess);
+    final hasStepsAccess = _canAttemptRead(
+      platform: availability.platform,
+      status: stepsAccess,
+    );
+
+    final hasActiveEnergyAccess = _canAttemptRead(
+      platform: availability.platform,
+      status: activeEnergyAccess,
+    );
+
+    final hasWorkoutAccess = _canAttemptRead(
+      platform: availability.platform,
+      status: workoutAccess,
+    );
 
     final hasAnyAccess =
         hasStepsAccess || hasActiveEnergyAccess || hasWorkoutAccess;
@@ -78,6 +95,7 @@ class HealthTodayActivityService {
     if (!hasAnyAccess) {
       return HealthTodayActivityResult(
         status: HealthTodayActivityStatus.accessNeeded,
+        platform: availability.platform,
         hasStepsAccess: hasStepsAccess,
         hasActiveEnergyAccess: hasActiveEnergyAccess,
         hasWorkoutAccess: hasWorkoutAccess,
@@ -119,6 +137,7 @@ class HealthTodayActivityService {
 
     return HealthTodayActivityResult(
       status: HealthTodayActivityStatus.ready,
+      platform: availability.platform,
       summary: summary,
       hasStepsAccess: hasStepsAccess,
       hasActiveEnergyAccess: hasActiveEnergyAccess,
@@ -126,7 +145,15 @@ class HealthTodayActivityService {
     );
   }
 
-  bool _isGranted(HealthAccessStatus status) {
+  bool _canAttemptRead({
+    required HealthPlatform platform,
+    required HealthAccessStatus status,
+  }) {
+    if (platform == HealthPlatform.appleHealth) {
+      return status == HealthAccessStatus.granted ||
+          status == HealthAccessStatus.unknown;
+    }
+
     return status == HealthAccessStatus.granted;
   }
 }

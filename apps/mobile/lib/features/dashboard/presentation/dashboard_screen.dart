@@ -1,8 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../health/data/repositories/health_connect_data_repository.dart';
+import '../../health/data/repositories/health_data_repository_factory.dart';
+import '../../health/domain/entities/health_data_type.dart';
+import '../../health/domain/repositories/health_data_repository.dart';
 import '../../health/domain/services/health_today_activity_service.dart';
 import '../../meal_tracking/data/meal_storage.dart';
 import '../../meal_tracking/domain/entities/meal_entry.dart';
@@ -69,15 +70,19 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   HealthTodayActivityLoader _createDefaultActivityLoader() {
-    if (defaultTargetPlatform != TargetPlatform.android) {
+    final repository = createHealthDataRepository();
+
+    if (repository is! HealthActivityDataRepository) {
       return () async {
-        return const HealthTodayActivityResult(
+        final availability = await repository.checkAvailability();
+
+        return HealthTodayActivityResult(
           status: HealthTodayActivityStatus.unavailable,
+          platform: availability.platform,
         );
       };
     }
 
-    final repository = HealthConnectDataRepository();
     final service = HealthTodayActivityService(repository);
 
     return () => service.load();
@@ -551,7 +556,7 @@ class DashboardActivityCard extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2.5),
           ),
           SizedBox(width: 14),
-          Expanded(child: Text('Loading activity from Health Connect...')),
+          Expanded(child: Text('Loading health activity...')),
         ],
       );
     }
@@ -580,13 +585,20 @@ class DashboardActivityCard extends StatelessWidget {
       );
     }
 
+    final isAppleHealth = currentResult.platform == HealthPlatform.appleHealth;
+
     if (currentResult.status == HealthTodayActivityStatus.accessNeeded) {
       return _ActivityMessage(
         key: const ValueKey('activity-access-needed'),
         icon: Icons.health_and_safety_outlined,
-        title: 'Connect activity data',
-        message: 'Choose which Health Connect activity data Prana can read.',
-        actionLabel: 'Manage Health access',
+        title: isAppleHealth ? 'Connect Apple Health' : 'Connect activity data',
+        message: isAppleHealth
+            ? 'Choose the Apple Health data you want to share with Prana. '
+                  'Apple keeps individual read choices private.'
+            : 'Choose which Health Connect activity data Prana can read.',
+        actionLabel: isAppleHealth
+            ? 'Review Apple Health access'
+            : 'Manage Health access',
         onAction: onManageAccess,
       );
     }
@@ -605,14 +617,21 @@ class DashboardActivityCard extends StatelessWidget {
     }
 
     if (currentResult.hasFullAccess && !summary.hasActivity) {
-      return const _ActivityMessage(
-        key: ValueKey('activity-empty'),
+      return _ActivityMessage(
+        key: const ValueKey('activity-empty'),
         icon: Icons.directions_walk_outlined,
         title: 'No activity recorded today yet',
-        message:
-            'When Health Connect has activity data, your daily summary will appear here.',
-        footer:
-            'Active energy is informational and does not change your nutrition target.',
+        message: isAppleHealth
+            ? 'Prana will show activity that Apple Health makes available '
+                  'for today.'
+            : 'When Health Connect has activity data, your daily summary '
+                  'will appear here.',
+        footer: isAppleHealth
+            ? 'Apple Health keeps individual read permissions private. '
+                  'Active energy is informational and does not change your '
+                  'nutrition target.'
+            : 'Active energy is informational and does not change your '
+                  'nutrition target.',
       );
     }
 
@@ -630,12 +649,14 @@ class DashboardActivityCard extends StatelessWidget {
                 label: 'Steps',
                 value: _formatInteger(summary.steps),
                 isConnected: currentResult.hasStepsAccess,
+                showConnectionStatus: !isAppleHealth,
               ),
               _ActivityMetric(
                 icon: Icons.local_fire_department_outlined,
                 label: 'Active energy',
                 value: '${summary.activeEnergyKcal.toStringAsFixed(0)} kcal',
                 isConnected: currentResult.hasActiveEnergyAccess,
+                showConnectionStatus: !isAppleHealth,
               ),
               _ActivityMetric(
                 icon: Icons.fitness_center_outlined,
@@ -644,12 +665,14 @@ class DashboardActivityCard extends StatelessWidget {
                     '${summary.workoutCount} '
                     '${summary.workoutCount == 1 ? 'workout' : 'workouts'}',
                 isConnected: currentResult.hasWorkoutAccess,
+                showConnectionStatus: !isAppleHealth,
               ),
               _ActivityMetric(
                 icon: Icons.timer_outlined,
                 label: 'Workout time',
                 value: _formatDuration(summary.workoutDuration),
                 isConnected: currentResult.hasWorkoutAccess,
+                showConnectionStatus: !isAppleHealth,
               ),
             ];
 
@@ -688,7 +711,7 @@ class DashboardActivityCard extends StatelessWidget {
             );
           },
         ),
-        if (currentResult.hasPartialAccess) ...[
+        if (!isAppleHealth && currentResult.hasPartialAccess) ...[
           const SizedBox(height: 18),
           Container(
             width: double.infinity,
@@ -725,6 +748,37 @@ class DashboardActivityCard extends StatelessWidget {
               onPressed: onManageAccess,
               icon: const Icon(Icons.settings_outlined),
               label: const Text('Manage Health access'),
+            ),
+          ),
+        ],
+        if (isAppleHealth) ...[
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colors.secondaryContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.privacy_tip_outlined,
+                  size: 20,
+                  color: colors.onSecondaryContainer,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Apple Health keeps individual read permissions private. '
+                    'Prana shows only the data Apple Health makes available.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -790,22 +844,26 @@ class _ActivityMetric extends StatelessWidget {
     required this.label,
     required this.value,
     required this.isConnected,
+    required this.showConnectionStatus,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final bool isConnected;
+  final bool showConnectionStatus;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    final avatarBackground = isConnected
+    final useConnectedStyle = !showConnectionStatus || isConnected;
+
+    final avatarBackground = useConnectedStyle
         ? colors.secondaryContainer
         : colors.surfaceContainerHighest;
 
-    final avatarForeground = isConnected
+    final avatarForeground = useConnectedStyle
         ? colors.onSecondaryContainer
         : colors.onSurfaceVariant;
 
@@ -823,12 +881,14 @@ class _ActivityMetric extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                isConnected ? value : '—',
+                showConnectionStatus && !isConnected ? '—' : value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: isConnected ? null : colors.onSurfaceVariant,
+                  color: showConnectionStatus && !isConnected
+                      ? colors.onSurfaceVariant
+                      : null,
                 ),
               ),
               const SizedBox(height: 2),
@@ -838,14 +898,18 @@ class _ActivityMetric extends StatelessWidget {
                   context,
                 ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
               ),
-              const SizedBox(height: 3),
-              Text(
-                isConnected ? 'Connected' : 'Not connected',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: isConnected ? colors.primary : colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
+              if (showConnectionStatus) ...[
+                const SizedBox(height: 3),
+                Text(
+                  isConnected ? 'Connected' : 'Not connected',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: isConnected
+                        ? colors.primary
+                        : colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
