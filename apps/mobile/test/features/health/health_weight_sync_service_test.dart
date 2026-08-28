@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:mobile/features/health/domain/entities/health_data_type.dart';
 import 'package:mobile/features/health/domain/entities/health_weight_sample.dart';
 import 'package:mobile/features/health/domain/repositories/health_data_repository.dart';
@@ -13,15 +12,13 @@ void main() {
       final healthRepository = FakeHealthWeightDataRepository(available: false);
 
       final weightStore = FakeWeightEntryStore();
-
       final service = HealthWeightSyncService(healthRepository, weightStore);
 
       final result = await service.sync(now: DateTime(2026, 8, 19));
 
       expect(result.status, HealthWeightSyncStatus.unavailable);
-
+      expect(result.platform, HealthPlatform.healthConnect);
       expect(healthRepository.readCalls, 0);
-
       expect(weightStore.saveCalls, 0);
     });
 
@@ -38,7 +35,6 @@ void main() {
       final result = await service.sync(now: DateTime(2026, 8, 19));
 
       expect(result.status, HealthWeightSyncStatus.accessNeeded);
-
       expect(healthRepository.readCalls, 0);
     });
 
@@ -57,59 +53,131 @@ void main() {
       );
 
       final weightStore = FakeWeightEntryStore();
-
       final service = HealthWeightSyncService(healthRepository, weightStore);
 
       final result = await service.sync(now: DateTime(2026, 8, 19));
 
       expect(result.status, HealthWeightSyncStatus.synced);
-
+      expect(result.platform, HealthPlatform.healthConnect);
       expect(result.fetchedCount, 1);
       expect(result.importedCount, 1);
       expect(result.updatedCount, 0);
 
-      expect(weightStore.entries, hasLength(1));
-
       final imported = weightStore.entries.single;
 
       expect(imported.id, 'health-connect:weight-123');
-
       expect(imported.weightKg, 63.4);
-
       expect(imported.measuredAt, measuredAt);
-
       expect(imported.source, WeightSource.healthConnect);
     });
 
-    test('repeated sync does not duplicate imported weight', () async {
-      final sample = HealthWeightSample(
-        externalId: 'weight-123',
-        weightKg: 63.4,
-        measuredAt: DateTime(2026, 8, 18, 7, 30),
-      );
+    test('imports Apple Health weight with Apple-specific identity', () async {
+      final measuredAt = DateTime(2026, 8, 27, 8, 15);
 
       final healthRepository = FakeHealthWeightDataRepository(
-        samples: [sample],
+        platform: HealthPlatform.appleHealth,
+        accessStatus: HealthAccessStatus.unknown,
+        samples: [
+          HealthWeightSample(
+            externalId: 'apple-weight-1',
+            weightKg: 62.8,
+            measuredAt: measuredAt,
+            sourceName: 'Apple Health',
+          ),
+        ],
       );
 
       final weightStore = FakeWeightEntryStore();
-
       final service = HealthWeightSyncService(healthRepository, weightStore);
 
-      await service.sync(now: DateTime(2026, 8, 19));
+      final result = await service.sync(now: DateTime(2026, 8, 28));
 
-      final secondResult = await service.sync(now: DateTime(2026, 8, 19));
+      expect(result.status, HealthWeightSyncStatus.synced);
+      expect(result.platform, HealthPlatform.appleHealth);
+      expect(result.importedCount, 1);
 
-      expect(weightStore.entries, hasLength(1));
+      final imported = weightStore.entries.single;
 
-      expect(secondResult.importedCount, 0);
-
-      expect(secondResult.updatedCount, 0);
-
-      expect(secondResult.skippedCount, 1);
-
-      expect(weightStore.saveCalls, 1);
+      expect(imported.id, 'apple-health:apple-weight-1');
+      expect(imported.weightKg, 62.8);
+      expect(imported.measuredAt, measuredAt);
+      expect(imported.source, WeightSource.appleHealth);
     });
+
+    test(
+      'does not read Apple Health weight before authorization is reviewed',
+      () async {
+        final healthRepository = FakeHealthWeightDataRepository(
+          platform: HealthPlatform.appleHealth,
+          accessStatus: HealthAccessStatus.notRequested,
+        );
+
+        final service = HealthWeightSyncService(
+          healthRepository,
+          FakeWeightEntryStore(),
+        );
+
+        final result = await service.sync(now: DateTime(2026, 8, 28));
+
+        expect(result.status, HealthWeightSyncStatus.accessNeeded);
+        expect(result.platform, HealthPlatform.appleHealth);
+        expect(healthRepository.readCalls, 0);
+      },
+    );
+
+    test(
+      'repeated Health Connect sync does not duplicate imported weight',
+      () async {
+        final sample = HealthWeightSample(
+          externalId: 'weight-123',
+          weightKg: 63.4,
+          measuredAt: DateTime(2026, 8, 18, 7, 30),
+        );
+
+        final healthRepository = FakeHealthWeightDataRepository(
+          samples: [sample],
+        );
+        final weightStore = FakeWeightEntryStore();
+        final service = HealthWeightSyncService(healthRepository, weightStore);
+
+        await service.sync(now: DateTime(2026, 8, 19));
+        final secondResult = await service.sync(now: DateTime(2026, 8, 19));
+
+        expect(weightStore.entries, hasLength(1));
+        expect(secondResult.importedCount, 0);
+        expect(secondResult.updatedCount, 0);
+        expect(secondResult.skippedCount, 1);
+        expect(weightStore.saveCalls, 1);
+      },
+    );
+
+    test(
+      'repeated Apple Health sync does not duplicate imported weight',
+      () async {
+        final sample = HealthWeightSample(
+          externalId: 'apple-weight-1',
+          weightKg: 62.8,
+          measuredAt: DateTime(2026, 8, 27, 8, 15),
+        );
+
+        final healthRepository = FakeHealthWeightDataRepository(
+          platform: HealthPlatform.appleHealth,
+          accessStatus: HealthAccessStatus.unknown,
+          samples: [sample],
+        );
+        final weightStore = FakeWeightEntryStore();
+        final service = HealthWeightSyncService(healthRepository, weightStore);
+
+        await service.sync(now: DateTime(2026, 8, 28));
+        final secondResult = await service.sync(now: DateTime(2026, 8, 28));
+
+        expect(weightStore.entries, hasLength(1));
+        expect(secondResult.importedCount, 0);
+        expect(secondResult.updatedCount, 0);
+        expect(secondResult.skippedCount, 1);
+        expect(weightStore.saveCalls, 1);
+      },
+    );
 
     test(
       'updates an existing Health Connect entry with the same external id',
@@ -141,10 +209,45 @@ void main() {
 
         expect(result.importedCount, 0);
         expect(result.updatedCount, 1);
-
         expect(weightStore.entries, hasLength(1));
-
         expect(weightStore.entries.single.weightKg, 63.6);
+      },
+    );
+
+    test(
+      'updates an existing Apple Health entry with the same external id',
+      () async {
+        final weightStore = FakeWeightEntryStore(
+          entries: [
+            WeightEntry(
+              id: 'apple-health:apple-weight-1',
+              weightKg: 63.1,
+              measuredAt: DateTime(2026, 8, 27, 7),
+              source: WeightSource.appleHealth,
+            ),
+          ],
+        );
+
+        final healthRepository = FakeHealthWeightDataRepository(
+          platform: HealthPlatform.appleHealth,
+          accessStatus: HealthAccessStatus.unknown,
+          samples: [
+            HealthWeightSample(
+              externalId: 'apple-weight-1',
+              weightKg: 62.9,
+              measuredAt: DateTime(2026, 8, 27, 7, 20),
+            ),
+          ],
+        );
+
+        final service = HealthWeightSyncService(healthRepository, weightStore);
+
+        final result = await service.sync(now: DateTime(2026, 8, 28));
+
+        expect(result.importedCount, 0);
+        expect(result.updatedCount, 1);
+        expect(weightStore.entries, hasLength(1));
+        expect(weightStore.entries.single.weightKg, 62.9);
       },
     );
 
@@ -173,11 +276,60 @@ void main() {
       await service.sync(now: DateTime(2026, 8, 19));
 
       expect(weightStore.entries, hasLength(2));
-
       expect(
         weightStore.entries.any(
           (entry) =>
               entry.id == manualEntry.id && entry.source == WeightSource.manual,
+        ),
+        isTrue,
+      );
+    });
+
+    test('keeps Health Connect and Apple Health records distinct', () async {
+      final weightStore = FakeWeightEntryStore(
+        entries: [
+          WeightEntry(
+            id: 'health-connect:shared-id',
+            weightKg: 64,
+            measuredAt: DateTime(2026, 8, 27, 7),
+            source: WeightSource.healthConnect,
+          ),
+        ],
+      );
+
+      final healthRepository = FakeHealthWeightDataRepository(
+        platform: HealthPlatform.appleHealth,
+        accessStatus: HealthAccessStatus.unknown,
+        samples: [
+          HealthWeightSample(
+            externalId: 'shared-id',
+            weightKg: 63.8,
+            measuredAt: DateTime(2026, 8, 27, 8),
+          ),
+        ],
+      );
+
+      final service = HealthWeightSyncService(healthRepository, weightStore);
+
+      final result = await service.sync(now: DateTime(2026, 8, 28));
+
+      expect(result.importedCount, 1);
+      expect(weightStore.entries, hasLength(2));
+
+      expect(
+        weightStore.entries.any(
+          (entry) =>
+              entry.id == 'health-connect:shared-id' &&
+              entry.source == WeightSource.healthConnect,
+        ),
+        isTrue,
+      );
+
+      expect(
+        weightStore.entries.any(
+          (entry) =>
+              entry.id == 'apple-health:shared-id' &&
+              entry.source == WeightSource.appleHealth,
         ),
         isTrue,
       );
@@ -196,7 +348,6 @@ void main() {
       await service.sync(now: now);
 
       expect(healthRepository.lastEndTime, now);
-
       expect(
         healthRepository.lastStartTime,
         now.subtract(const Duration(days: 30)),
@@ -208,14 +359,14 @@ void main() {
 class FakeHealthWeightDataRepository implements HealthWeightDataRepository {
   FakeHealthWeightDataRepository({
     this.available = true,
+    this.platform = HealthPlatform.healthConnect,
     this.accessStatus = HealthAccessStatus.granted,
     List<HealthWeightSample>? samples,
   }) : samples = samples ?? <HealthWeightSample>[];
 
   final bool available;
-
+  final HealthPlatform platform;
   final HealthAccessStatus accessStatus;
-
   final List<HealthWeightSample> samples;
 
   int readCalls = 0;
@@ -225,10 +376,7 @@ class FakeHealthWeightDataRepository implements HealthWeightDataRepository {
 
   @override
   Future<HealthAvailability> checkAvailability() async {
-    return HealthAvailability(
-      platform: HealthPlatform.healthConnect,
-      isAvailable: available,
-    );
+    return HealthAvailability(platform: platform, isAvailable: available);
   }
 
   @override

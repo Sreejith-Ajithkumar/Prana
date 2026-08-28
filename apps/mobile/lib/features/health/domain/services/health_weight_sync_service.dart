@@ -9,6 +9,7 @@ enum HealthWeightSyncStatus { synced, unavailable, accessNeeded }
 class HealthWeightSyncResult {
   const HealthWeightSyncResult({
     required this.status,
+    this.platform = HealthPlatform.unsupported,
     this.fetchedCount = 0,
     this.importedCount = 0,
     this.updatedCount = 0,
@@ -16,6 +17,7 @@ class HealthWeightSyncResult {
   });
 
   final HealthWeightSyncStatus status;
+  final HealthPlatform platform;
   final int fetchedCount;
   final int importedCount;
   final int updatedCount;
@@ -29,10 +31,7 @@ class HealthWeightSyncService {
 
   static const Duration defaultLookback = Duration(days: 30);
 
-  static const String _entryIdPrefix = 'health-connect:';
-
   final HealthWeightDataRepository _healthRepository;
-
   final WeightEntryStore _weightStore;
 
   Future<HealthWeightSyncResult> sync({
@@ -49,9 +48,11 @@ class HealthWeightSyncService {
 
     final availability = await _healthRepository.checkAvailability();
 
-    if (!availability.isAvailable) {
-      return const HealthWeightSyncResult(
+    if (!availability.isAvailable ||
+        !_isSupportedPlatform(availability.platform)) {
+      return HealthWeightSyncResult(
         status: HealthWeightSyncStatus.unavailable,
+        platform: availability.platform,
       );
     }
 
@@ -59,9 +60,13 @@ class HealthWeightSyncService {
       HealthDataType.bodyWeight,
     });
 
-    if (accessStatus != HealthAccessStatus.granted) {
-      return const HealthWeightSyncResult(
+    if (!_canReadWeight(
+      platform: availability.platform,
+      accessStatus: accessStatus,
+    )) {
+      return HealthWeightSyncResult(
         status: HealthWeightSyncStatus.accessNeeded,
+        platform: availability.platform,
       );
     }
 
@@ -74,7 +79,6 @@ class HealthWeightSyncService {
     );
 
     final existingEntries = await _weightStore.loadEntries();
-
     final mergedEntries = List<WeightEntry>.from(existingEntries);
 
     final indexById = <String, int>{
@@ -83,7 +87,6 @@ class HealthWeightSyncService {
     };
 
     final uniqueSamples = <String, HealthWeightSample>{};
-
     var skippedCount = 0;
 
     for (final sample in samples) {
@@ -103,27 +106,27 @@ class HealthWeightSyncService {
       uniqueSamples[externalId] = sample;
     }
 
+    final importConfig = _importConfigFor(availability.platform);
+
     var importedCount = 0;
     var updatedCount = 0;
 
     for (final entry in uniqueSamples.entries) {
       final externalId = entry.key;
       final sample = entry.value;
-
-      final entryId = '$_entryIdPrefix$externalId';
+      final entryId = '${importConfig.entryIdPrefix}$externalId';
 
       final importedEntry = WeightEntry(
         id: entryId,
         weightKg: sample.weightKg,
         measuredAt: sample.measuredAt,
-        source: WeightSource.healthConnect,
+        source: importConfig.weightSource,
       );
 
       final existingIndex = indexById[entryId];
 
       if (existingIndex == null) {
         indexById[entryId] = mergedEntries.length;
-
         mergedEntries.add(importedEntry);
         importedCount++;
         continue;
@@ -131,7 +134,7 @@ class HealthWeightSyncService {
 
       final existing = mergedEntries[existingIndex];
 
-      if (existing.source != WeightSource.healthConnect) {
+      if (existing.source != importConfig.weightSource) {
         skippedCount++;
         continue;
       }
@@ -146,7 +149,6 @@ class HealthWeightSyncService {
       }
 
       mergedEntries[existingIndex] = importedEntry;
-
       updatedCount++;
     }
 
@@ -156,10 +158,54 @@ class HealthWeightSyncService {
 
     return HealthWeightSyncResult(
       status: HealthWeightSyncStatus.synced,
+      platform: availability.platform,
       fetchedCount: samples.length,
       importedCount: importedCount,
       updatedCount: updatedCount,
       skippedCount: skippedCount,
     );
   }
+
+  bool _isSupportedPlatform(HealthPlatform platform) {
+    return platform == HealthPlatform.healthConnect ||
+        platform == HealthPlatform.appleHealth;
+  }
+
+  bool _canReadWeight({
+    required HealthPlatform platform,
+    required HealthAccessStatus accessStatus,
+  }) {
+    if (accessStatus == HealthAccessStatus.granted) {
+      return true;
+    }
+
+    return platform == HealthPlatform.appleHealth &&
+        accessStatus == HealthAccessStatus.unknown;
+  }
+
+  _HealthWeightImportConfig _importConfigFor(HealthPlatform platform) {
+    return switch (platform) {
+      HealthPlatform.healthConnect => const _HealthWeightImportConfig(
+        entryIdPrefix: 'health-connect:',
+        weightSource: WeightSource.healthConnect,
+      ),
+      HealthPlatform.appleHealth => const _HealthWeightImportConfig(
+        entryIdPrefix: 'apple-health:',
+        weightSource: WeightSource.appleHealth,
+      ),
+      HealthPlatform.unsupported => throw StateError(
+        'Unsupported health platform cannot import weight.',
+      ),
+    };
+  }
+}
+
+class _HealthWeightImportConfig {
+  const _HealthWeightImportConfig({
+    required this.entryIdPrefix,
+    required this.weightSource,
+  });
+
+  final String entryIdPrefix;
+  final WeightSource weightSource;
 }
