@@ -1,19 +1,42 @@
-# Prana v0.6.0 Documentation Package
+# Prana v0.7.0 Documentation Package
 
-This package contains the Sprint 6 / v0.6.0 documentation set for Prana.
+This documentation set covers Sprint 7 — Health & Wearables and the `v0.7.0` internal release preparation.
 
 ## Included
 
-- `docs/sprints/sprint-06-weight-progress.md`
-- `docs/architecture/weight-tracking.md`
-- `docs/product/progress-experience.md`
-- `docs/releases/v0.6.0.md`
-- `docs/sprints/sprint-07-handoff.md`
-- `docs/CHANGELOG_v0.6.0_SNIPPET.md`
-- `RELEASE_V0.6.0_CHECKLIST.md`
+- `docs/sprints/sprint_07/SPRINT_07.md`
+- `docs/architecture/health-wearables.md`
+- `docs/releases/v0.7.0.md`
+- `docs/sprints/sprint_07/sprint-08-handoff.md`
+- `docs/CHANGELOG.md`
+- `docs/RELEASE_V0.7.0_CHECKLIST.md`
 
-## Important
+Existing Sprint 6 and earlier documentation remains in place.
 
-`docs/CHANGELOG_v0.6.0_SNIPPET.md` is intentionally a snippet rather than a full replacement for your existing `docs/CHANGELOG.md`. Merge the snippet into the existing changelog so earlier release history is preserved.
+## Current release status
 
-The documentation records the latest known Sprint 6 code checkpoint at commit `ac1baf5`. Before tagging `v0.6.0`, rerun the final release gate after all documentation changes are committed.
+Latest known Sprint 7 development validation:
+
+```text
+flutter analyze: no issues found
+flutter test: 144 tests passed
+flutter build apk --release: successful
+Android release APK: 51.0 MB
+```
+
+Android Health Connect has received real-device connection/settings validation.
+
+Apple Health architecture and iOS HealthKit project configuration are implemented, but final iOS build/signing/physical-device validation remains pending macOS/Xcode access.
+
+## Important release rule
+
+Do not create `v0.7.0` until:
+
+- documentation is committed
+- working tree is clean
+- final analyzer/tests pass
+- the release commit is selected
+- known Health plugin KGP warning is documented
+- iOS validation status is accurately marked pending
+
+After tagging, use the existing safe release script to build the exact tag and generate the SHA256 artifact.
