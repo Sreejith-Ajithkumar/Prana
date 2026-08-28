@@ -165,8 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _ProfileNavigationRow(
                         icon: Icons.health_and_safety_outlined,
                         label: 'Health connections',
-                        description:
-                            'Manage Health Connect and wearable access.',
+                        description: 'Manage health and wearable access',
                         onTap: _openHealthWearables,
                       ),
                     ],
