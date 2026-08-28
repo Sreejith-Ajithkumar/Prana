@@ -8,7 +8,7 @@ import 'package:mobile/features/health/presentation/health_wearables_screen.dart
 
 void main() {
   group('HealthWearablesScreen', () {
-    testWidgets('shows connected state when health access is granted', (
+    testWidgets('shows connected Health Connect state when access is granted', (
       tester,
     ) async {
       final repository = FakeHealthDataRepository(
@@ -22,19 +22,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Health & wearables'), findsOneWidget);
-
+      expect(find.text('Health Connect'), findsOneWidget);
       expect(find.text('Connected'), findsOneWidget);
-
       expect(find.text('Body weight'), findsOneWidget);
-
       expect(find.text('Steps'), findsOneWidget);
-
       expect(find.text('Active energy'), findsOneWidget);
-
       expect(find.text('Workouts'), findsOneWidget);
     });
 
-    testWidgets('requests health access when connect is tapped', (
+    testWidgets('requests Health Connect access when connect is tapped', (
       tester,
     ) async {
       final repository = FakeHealthDataRepository(
@@ -51,15 +47,15 @@ void main() {
       expect(find.text('Access needed'), findsOneWidget);
 
       await tester.tap(find.text('Connect Health Connect'));
-
       await tester.pumpAndSettle();
 
       expect(repository.requestAccessCalls, 1);
-
       expect(find.text('Connected'), findsOneWidget);
     });
 
-    testWidgets('opens health settings from manage access', (tester) async {
+    testWidgets('opens Health Connect settings from manage access', (
+      tester,
+    ) async {
       final repository = FakeHealthDataRepository(
         accessStatus: HealthAccessStatus.granted,
       );
@@ -71,7 +67,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Manage access'));
-
       await tester.pumpAndSettle();
 
       expect(repository.openSettingsCalls, 1);
@@ -92,9 +87,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Unavailable'), findsOneWidget);
-
       expect(find.text('Connect Health Connect'), findsNothing);
-
       expect(find.text('Manage access'), findsNothing);
     });
 
@@ -112,6 +105,7 @@ void main() {
             weightSyncAction: () async {
               return const HealthWeightSyncResult(
                 status: HealthWeightSyncStatus.synced,
+                platform: HealthPlatform.healthConnect,
               );
             },
           ),
@@ -121,8 +115,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Weight sync'), findsOneWidget);
-
       expect(find.text('Sync weight now'), findsOneWidget);
+      expect(find.textContaining('from Health Connect'), findsOneWidget);
     });
 
     testWidgets('shows imported measurement count after weight sync', (
@@ -143,6 +137,7 @@ void main() {
 
               return const HealthWeightSyncResult(
                 status: HealthWeightSyncStatus.synced,
+                platform: HealthPlatform.healthConnect,
                 fetchedCount: 1,
                 importedCount: 1,
               );
@@ -157,11 +152,9 @@ void main() {
 
       await tester.ensureVisible(syncButton);
       await tester.tap(syncButton);
-
       await tester.pumpAndSettle();
 
       expect(syncCalls, 1);
-
       expect(find.text('Imported 1 new weight measurement.'), findsOneWidget);
     });
 
@@ -179,6 +172,7 @@ void main() {
             weightSyncAction: () async {
               return const HealthWeightSyncResult(
                 status: HealthWeightSyncStatus.synced,
+                platform: HealthPlatform.healthConnect,
                 fetchedCount: 1,
                 skippedCount: 1,
               );
@@ -193,11 +187,166 @@ void main() {
 
       await tester.ensureVisible(syncButton);
       await tester.tap(syncButton);
-
       await tester.pumpAndSettle();
 
       expect(
         find.text('Weight history is already up to date.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('shows Apple Health access-not-requested state', (
+      tester,
+    ) async {
+      final repository = FakeHealthDataRepository(
+        platform: HealthPlatform.appleHealth,
+        accessStatus: HealthAccessStatus.notRequested,
+        requestedStatus: HealthAccessStatus.unknown,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthWearablesScreen(
+            repository: repository,
+            weightSyncAction: () async {
+              return const HealthWeightSyncResult(
+                status: HealthWeightSyncStatus.synced,
+                platform: HealthPlatform.appleHealth,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Apple Health'), findsOneWidget);
+      expect(find.text('Access not requested'), findsOneWidget);
+      expect(find.text('Connect Apple Health'), findsOneWidget);
+      expect(find.text('Connected'), findsNothing);
+      expect(find.text('Manage access'), findsNothing);
+      expect(find.textContaining('Health app or iOS Settings'), findsOneWidget);
+    });
+
+    testWidgets('shows Apple Health access reviewed after authorization', (
+      tester,
+    ) async {
+      final repository = FakeHealthDataRepository(
+        platform: HealthPlatform.appleHealth,
+        accessStatus: HealthAccessStatus.notRequested,
+        requestedStatus: HealthAccessStatus.unknown,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthWearablesScreen(
+            repository: repository,
+            weightSyncAction: () async {
+              return const HealthWeightSyncResult(
+                status: HealthWeightSyncStatus.synced,
+                platform: HealthPlatform.appleHealth,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Connect Apple Health'));
+      await tester.pumpAndSettle();
+
+      expect(repository.requestAccessCalls, 1);
+      expect(find.text('Access reviewed'), findsOneWidget);
+      expect(find.text('Review Apple Health access'), findsOneWidget);
+      expect(
+        find.textContaining('individual read choices private'),
+        findsOneWidget,
+      );
+      expect(find.text('Connected'), findsNothing);
+    });
+
+    testWidgets('allows Apple Health weight sync after access review', (
+      tester,
+    ) async {
+      var syncCalls = 0;
+
+      final repository = FakeHealthDataRepository(
+        platform: HealthPlatform.appleHealth,
+        accessStatus: HealthAccessStatus.unknown,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthWearablesScreen(
+            repository: repository,
+            weightSyncAction: () async {
+              syncCalls++;
+
+              return const HealthWeightSyncResult(
+                status: HealthWeightSyncStatus.synced,
+                platform: HealthPlatform.appleHealth,
+                fetchedCount: 1,
+                importedCount: 1,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          'Apple Health measurements instead of creating duplicates',
+        ),
+        findsOneWidget,
+      );
+
+      final syncButton = find.text('Sync weight now');
+
+      await tester.ensureVisible(syncButton);
+      await tester.tap(syncButton);
+      await tester.pumpAndSettle();
+
+      expect(syncCalls, 1);
+      expect(find.text('Imported 1 new weight measurement.'), findsOneWidget);
+    });
+
+    testWidgets('uses Apple Health name in empty weight sync result', (
+      tester,
+    ) async {
+      final repository = FakeHealthDataRepository(
+        platform: HealthPlatform.appleHealth,
+        accessStatus: HealthAccessStatus.unknown,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HealthWearablesScreen(
+            repository: repository,
+            weightSyncAction: () async {
+              return const HealthWeightSyncResult(
+                status: HealthWeightSyncStatus.synced,
+                platform: HealthPlatform.appleHealth,
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final syncButton = find.text('Sync weight now');
+
+      await tester.ensureVisible(syncButton);
+      await tester.tap(syncButton);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'No Apple Health weight measurements were found in the last 30 days.',
+        ),
         findsOneWidget,
       );
     });
@@ -207,14 +356,15 @@ void main() {
 class FakeHealthDataRepository implements HealthDataRepository {
   FakeHealthDataRepository({
     this.available = true,
+    this.platform = HealthPlatform.healthConnect,
     this.accessStatus = HealthAccessStatus.denied,
     HealthAccessStatus? requestedStatus,
   }) : requestedStatus = requestedStatus ?? accessStatus;
 
   final bool available;
+  final HealthPlatform platform;
 
   HealthAccessStatus accessStatus;
-
   final HealthAccessStatus requestedStatus;
 
   int requestAccessCalls = 0;
@@ -222,10 +372,7 @@ class FakeHealthDataRepository implements HealthDataRepository {
 
   @override
   Future<HealthAvailability> checkAvailability() async {
-    return HealthAvailability(
-      platform: HealthPlatform.healthConnect,
-      isAvailable: available,
-    );
+    return HealthAvailability(platform: platform, isAvailable: available);
   }
 
   @override

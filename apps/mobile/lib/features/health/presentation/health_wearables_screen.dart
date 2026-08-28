@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../weight_tracking/data/weight_storage.dart';
-import '../data/repositories/health_connect_data_repository.dart';
+import '../data/repositories/health_data_repository_factory.dart';
 import '../domain/entities/health_data_type.dart';
 import '../domain/repositories/health_data_repository.dart';
 import '../domain/services/health_weight_sync_service.dart';
@@ -16,7 +16,6 @@ class HealthWearablesScreen extends StatefulWidget {
   });
 
   final HealthDataRepository? repository;
-
   final HealthWeightSyncAction? weightSyncAction;
 
   @override
@@ -52,7 +51,7 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
 
     WidgetsBinding.instance.addObserver(this);
 
-    _repository = widget.repository ?? HealthConnectDataRepository();
+    _repository = widget.repository ?? createHealthDataRepository();
 
     _weightSyncAction =
         widget.weightSyncAction ?? _createDefaultWeightSyncAction(_repository);
@@ -104,13 +103,9 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
     try {
       final availability = await _repository.checkAvailability();
 
-      HealthAccessStatus accessStatus;
-
-      if (!availability.isAvailable) {
-        accessStatus = HealthAccessStatus.unavailable;
-      } else {
-        accessStatus = await _repository.getAccessStatus(_requestedTypes);
-      }
+      final accessStatus = availability.isAvailable
+          ? await _repository.getAccessStatus(_requestedTypes)
+          : HealthAccessStatus.unavailable;
 
       if (!mounted) {
         return;
@@ -189,7 +184,7 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
       }
 
       setState(() {
-        _errorMessage = 'Health Connect settings could not be opened.';
+        _errorMessage = '$_platformName settings could not be opened.';
       });
     } finally {
       if (mounted) {
@@ -228,15 +223,15 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
             _weightSyncMessageIsError = false;
 
           case HealthWeightSyncStatus.unavailable:
+            final platformName = _syncPlatformName(result);
             _weightSyncMessage =
-                'Health Connect is not available, so '
-                'weight could not be synced.';
+                '$platformName is not available, so weight could not be synced.';
             _weightSyncMessageIsError = true;
 
           case HealthWeightSyncStatus.accessNeeded:
             _weightSyncMessage =
-                'Body-weight access is needed before '
-                'Prana can sync measurements.';
+                'Body-weight access is needed before Prana can sync '
+                'measurements.';
             _weightSyncMessageIsError = true;
         }
       });
@@ -261,7 +256,7 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
   String _formatSuccessfulSync(HealthWeightSyncResult result) {
     if (result.importedCount == 0 && result.updatedCount == 0) {
       if (result.fetchedCount == 0) {
-        return 'No Health Connect weight measurements '
+        return 'No ${_syncPlatformName(result)} weight measurements '
             'were found in the last 30 days.';
       }
 
@@ -287,19 +282,48 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
     return '${parts.join(' and ')}.';
   }
 
+  String _syncPlatformName(HealthWeightSyncResult result) {
+    final resultPlatform = result.platform;
+
+    if (resultPlatform != HealthPlatform.unsupported) {
+      return _platformNameFor(resultPlatform);
+    }
+
+    return _platformName;
+  }
+
   String _measurementLabel(int count) {
     return count == 1 ? 'weight measurement' : 'weight measurements';
   }
 
   bool get _isAvailable => _availability?.isAvailable == true;
 
-  bool get _canAttemptWeightSync =>
-      _isAvailable &&
-      (_accessStatus == HealthAccessStatus.granted ||
-          _accessStatus == HealthAccessStatus.partiallyGranted);
+  bool get _isAppleHealth =>
+      _availability?.platform == HealthPlatform.appleHealth;
+
+  bool get _isHealthConnect =>
+      _availability?.platform == HealthPlatform.healthConnect;
+
+  bool get _canAttemptWeightSync {
+    if (!_isAvailable) {
+      return false;
+    }
+
+    if (_isAppleHealth) {
+      return _accessStatus == HealthAccessStatus.unknown ||
+          _accessStatus == HealthAccessStatus.granted;
+    }
+
+    return _accessStatus == HealthAccessStatus.granted ||
+        _accessStatus == HealthAccessStatus.partiallyGranted;
+  }
 
   String get _platformName {
-    return switch (_availability?.platform) {
+    return _platformNameFor(_availability?.platform);
+  }
+
+  String _platformNameFor(HealthPlatform? platform) {
+    return switch (platform) {
       HealthPlatform.healthConnect => 'Health Connect',
       HealthPlatform.appleHealth => 'Apple Health',
       HealthPlatform.unsupported || null => 'Health integration',
@@ -307,6 +331,17 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
   }
 
   String get _statusTitle {
+    if (_isAppleHealth) {
+      return switch (_accessStatus) {
+        HealthAccessStatus.notRequested => 'Access not requested',
+        HealthAccessStatus.unknown ||
+        HealthAccessStatus.granted ||
+        HealthAccessStatus.partiallyGranted => 'Access reviewed',
+        HealthAccessStatus.denied => 'Access needed',
+        HealthAccessStatus.unavailable => 'Unavailable',
+      };
+    }
+
     return switch (_accessStatus) {
       HealthAccessStatus.granted => 'Connected',
       HealthAccessStatus.partiallyGranted => 'Some access granted',
@@ -318,22 +353,36 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
   }
 
   String get _statusDescription {
+    if (_isAppleHealth) {
+      return switch (_accessStatus) {
+        HealthAccessStatus.notRequested =>
+          'Choose the Apple Health information you want to share with Prana.',
+        HealthAccessStatus.unknown ||
+        HealthAccessStatus.granted ||
+        HealthAccessStatus.partiallyGranted =>
+          'Apple Health keeps individual read choices private. Prana shows '
+              'only the health information Apple Health makes available.',
+        HealthAccessStatus.denied =>
+          'Review Apple Health access to choose what Prana can read.',
+        HealthAccessStatus.unavailable =>
+          'Apple Health is not currently available on this device.',
+      };
+    }
+
     return switch (_accessStatus) {
       HealthAccessStatus.granted =>
-        'Prana can read the health information '
-            'you approved.',
+        'Prana can read the health information you approved.',
       HealthAccessStatus.partiallyGranted =>
-        'Some requested health information is '
-            'available. You can review access to '
-            'enable the rest.',
+        'Some requested health information is available. You can review '
+            'access to enable the rest.',
       HealthAccessStatus.denied =>
-        'Connect Prana to import approved health '
-            'and activity information.',
+        'Connect Prana to import approved health and activity information.',
       HealthAccessStatus.notRequested =>
         'Connect your health data when you are ready.',
       HealthAccessStatus.unavailable =>
-        'Health Connect is not currently available '
-            'on this device.',
+        _isHealthConnect
+            ? 'Health Connect is not currently available on this device.'
+            : 'Health integration is not currently available on this device.',
       HealthAccessStatus.unknown => 'Prana is checking your health connection.',
     };
   }
@@ -345,16 +394,60 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
       HealthAccessStatus.denied => Icons.lock_outline,
       HealthAccessStatus.notRequested => Icons.link_outlined,
       HealthAccessStatus.unavailable => Icons.block_outlined,
-      HealthAccessStatus.unknown => Icons.sync_outlined,
+      HealthAccessStatus.unknown =>
+        _isAppleHealth ? Icons.privacy_tip_outlined : Icons.sync_outlined,
     };
   }
 
   String get _connectButtonLabel {
+    if (_isAppleHealth) {
+      return switch (_accessStatus) {
+        HealthAccessStatus.notRequested ||
+        HealthAccessStatus.denied => 'Connect Apple Health',
+        _ => 'Review Apple Health access',
+      };
+    }
+
     return switch (_accessStatus) {
       HealthAccessStatus.granted => 'Review access',
       HealthAccessStatus.partiallyGranted => 'Complete access',
       _ => 'Connect Health Connect',
     };
+  }
+
+  String get _weightSyncIntro {
+    if (_isAppleHealth) {
+      return 'Import body-weight measurements Apple Health makes available '
+          'into your existing Prana weight history.';
+    }
+
+    return 'Import approved body-weight measurements from Health Connect '
+        'into your existing Prana weight history.';
+  }
+
+  String get _weightSyncDeduplicationCopy {
+    if (_isAppleHealth) {
+      return 'Re-syncing updates existing Apple Health measurements instead '
+          'of creating duplicates.';
+    }
+
+    return 'Re-syncing updates existing Health Connect measurements instead '
+        'of creating duplicates.';
+  }
+
+  String get _readOnlyCopy {
+    if (_isAppleHealth) {
+      return 'Prana currently reads health information only. It does not '
+          'write changes back to Apple Health.';
+    }
+
+    if (_isHealthConnect) {
+      return 'Prana currently reads approved health information only. It '
+          'does not write changes back to Health Connect.';
+    }
+
+    return 'Prana currently reads approved health information only and does '
+        'not write health changes back to connected services.';
   }
 
   @override
@@ -463,16 +556,30 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
                   ),
                 ),
 
-                const SizedBox(height: 8),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: _acting || _syncingWeight ? null : _openSettings,
-                    icon: const Icon(Icons.settings_outlined),
-                    label: const Text('Manage access'),
+                if (_isHealthConnect) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _acting || _syncingWeight
+                          ? null
+                          : _openSettings,
+                      icon: const Icon(Icons.settings_outlined),
+                      label: const Text('Manage access'),
+                    ),
                   ),
-                ),
+                ],
+
+                if (_isAppleHealth) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'You can change Apple Health sharing later from the '
+                    'Health app or iOS Settings.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ],
             ],
           ],
@@ -513,19 +620,11 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
             ),
 
             const SizedBox(height: 10),
-
-            const Text(
-              'Import approved body-weight '
-              'measurements from Health Connect into '
-              'your existing Prana weight history.',
-            ),
+            Text(_weightSyncIntro),
 
             const SizedBox(height: 8),
-
             Text(
-              'Re-syncing updates existing Health '
-              'Connect measurements instead of '
-              'creating duplicates.',
+              _weightSyncDeduplicationCopy,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -554,8 +653,11 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
             if (!_canAttemptWeightSync) ...[
               const SizedBox(height: 10),
               Text(
-                'Grant health access before syncing '
-                'body-weight measurements.',
+                _isAppleHealth
+                    ? 'Review Apple Health access before syncing '
+                          'body-weight measurements.'
+                    : 'Grant health access before syncing body-weight '
+                          'measurements.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -573,8 +675,8 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
             const SizedBox(height: 12),
 
             Text(
-              'After syncing, open Progress and pull '
-              'down to refresh if it is already open.',
+              'After syncing, open Progress and pull down to refresh if it '
+              'is already open.',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -595,49 +697,38 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('What Prana can read', style: theme.textTheme.titleMedium),
-
             const SizedBox(height: 6),
-
             Text(
-              'You stay in control. Prana only '
-              'requests the health information needed '
-              'for the features below.',
+              'You stay in control. Prana only requests the health '
+              'information needed for the features below.',
               style: theme.textTheme.bodyMedium,
             ),
-
             const SizedBox(height: 20),
-
             const _HealthDataRow(
               icon: Icons.monitor_weight_outlined,
               title: 'Body weight',
               description:
-                  'Use approved measurements in your '
-                  'weight history and progress.',
+                  'Use approved measurements in your weight history and '
+                  'progress.',
             ),
-
             const _HealthDataRow(
               icon: Icons.directions_walk_outlined,
               title: 'Steps',
-              description:
-                  'Understand daily movement and '
-                  'activity.',
+              description: 'Understand daily movement and activity.',
             ),
-
             const _HealthDataRow(
               icon: Icons.local_fire_department_outlined,
               title: 'Active energy',
               description:
-                  'Add activity context without '
-                  'treating device estimates as exact.',
+                  'Add activity context without treating device estimates '
+                  'as exact.',
             ),
-
             const _HealthDataRow(
               icon: Icons.fitness_center_outlined,
               title: 'Workouts',
               description:
-                  'Recognize exercise sessions '
-                  'recorded by connected health apps '
-                  'and devices.',
+                  'Recognize exercise sessions recorded by connected '
+                  'health apps and devices.',
               showDivider: false,
             ),
           ],
@@ -656,9 +747,7 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(Icons.shield_outlined, color: theme.colorScheme.primary),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -667,23 +756,13 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
                     'Read-only and user controlled',
                     style: theme.textTheme.titleMedium,
                   ),
-
                   const SizedBox(height: 6),
-
-                  const Text(
-                    'Prana currently reads approved '
-                    'health information only. It does '
-                    'not write changes back to Health '
-                    'Connect.',
-                  ),
-
+                  Text(_readOnlyCopy),
                   const SizedBox(height: 10),
-
                   const Text(
-                    'Activity calories are kept '
-                    'separate from your nutrition '
-                    'target and are not automatically '
-                    'added back to your food budget.',
+                    'Activity calories are kept separate from your nutrition '
+                    'target and are not automatically added back to your '
+                    'food budget.',
                   ),
                 ],
               ),
@@ -704,9 +783,7 @@ class _HealthWearablesScreenState extends State<HealthWearablesScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(Icons.error_outline, color: theme.colorScheme.error),
-
             const SizedBox(width: 12),
-
             Expanded(
               child: Text(
                 _errorMessage!,
@@ -775,9 +852,7 @@ class _HealthDataRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Icon(icon, color: theme.colorScheme.primary),
-
             const SizedBox(width: 14),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,7 +865,6 @@ class _HealthDataRow extends StatelessWidget {
             ),
           ],
         ),
-
         if (showDivider) ...[
           const SizedBox(height: 14),
           const Divider(),
