@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/local_food_repository.dart';
+import '../../data/food_repository_factory.dart';
 import '../../domain/entities/catalog_food.dart';
+import '../../domain/repositories/food_repository.dart';
 
 class FoodSearchScreen extends StatefulWidget {
-  const FoodSearchScreen({super.key});
+  const FoodSearchScreen({super.key, this.repository});
+
+  final FoodRepository? repository;
 
   @override
   State<FoodSearchScreen> createState() => _FoodSearchScreenState();
@@ -14,14 +17,18 @@ class FoodSearchScreen extends StatefulWidget {
 class _FoodSearchScreenState extends State<FoodSearchScreen> {
   final _searchController = TextEditingController();
 
-  final LocalFoodRepository _repository = const LocalFoodRepository();
+  late final FoodRepository _repository;
 
   List<CatalogFood> _results = [];
   bool _isLoading = true;
+  String? _errorMessage;
+  int _searchRevision = 0;
 
   @override
   void initState() {
     super.initState();
+
+    _repository = widget.repository ?? createFoodRepository();
     _searchFoods('');
   }
 
@@ -32,20 +39,35 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   Future<void> _searchFoods(String query) async {
+    final revision = ++_searchRevision;
+
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
-    final results = await _repository.searchFoods(query);
+    try {
+      final results = await _repository.searchFoods(query);
 
-    if (!mounted) {
-      return;
+      if (!mounted || revision != _searchRevision) {
+        return;
+      }
+
+      setState(() {
+        _results = results;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || revision != _searchRevision) {
+        return;
+      }
+
+      setState(() {
+        _results = [];
+        _isLoading = false;
+        _errorMessage = 'Prana could not search foods right now.';
+      });
     }
-
-    setState(() {
-      _results = results;
-      _isLoading = false;
-    });
   }
 
   void _selectFood(CatalogFood food) {
@@ -71,6 +93,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                       tooltip: 'Clear search',
                       onPressed: () {
                         _searchController.clear();
+                        setState(() {});
                         _searchFoods('');
                       },
                       icon: const Icon(Icons.close),
@@ -108,6 +131,13 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
+    if (_errorMessage != null) {
+      return _SearchError(
+        message: _errorMessage!,
+        onRetry: () => _searchFoods(_searchController.text),
+      );
+    }
+
     if (_results.isEmpty) {
       return const _NoResults();
     }
@@ -135,6 +165,8 @@ class _FoodResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final detail = _foodDetail(food);
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -143,7 +175,7 @@ class _FoodResultCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              CircleAvatar(child: const Icon(Icons.restaurant_outlined)),
+              const CircleAvatar(child: Icon(Icons.restaurant_outlined)),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -153,6 +185,15 @@ class _FoodResultCard extends StatelessWidget {
                       food.name,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
+                    if (detail != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        detail,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       food.servingDescription,
@@ -163,9 +204,9 @@ class _FoodResultCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       '${_formatNumber(food.proteinGrams)} g protein'
-                      ' • '
+                      ' \u2022 '
                       '${_formatNumber(food.carbohydrateGrams)} g carbs'
-                      ' • '
+                      ' \u2022 '
                       '${_formatNumber(food.fatGrams)} g fat',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
@@ -193,12 +234,61 @@ class _FoodResultCard extends StatelessWidget {
     );
   }
 
+  static String? _foodDetail(CatalogFood food) {
+    final brand = food.brand?.trim();
+
+    if (brand != null && brand.isNotEmpty) {
+      return brand;
+    }
+
+    return switch (food.source) {
+      CatalogFoodSource.localCatalog => null,
+      CatalogFoodSource.custom => 'Custom food',
+      CatalogFoodSource.externalCatalog => 'External catalog',
+      CatalogFoodSource.aiSuggestion => 'AI suggestion',
+    };
+  }
+
   static String _formatNumber(double value) {
     if (value == value.roundToDouble()) {
       return value.toStringAsFixed(0);
     }
 
     return value.toStringAsFixed(1);
+  }
+}
+
+class _SearchError extends StatelessWidget {
+  const _SearchError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 16),
+            Text(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try again'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

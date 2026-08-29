@@ -162,4 +162,15 @@ class LocalFoodRepository implements FoodRepository {
 
     return null;
   }
+
+  @override
+  Future<CatalogFood?> findFoodByIdentity(String identityKey) async {
+    for (final food in _foods) {
+      if (food.identityKey == identityKey) {
+        return food;
+      }
+    }
+
+    return null;
+  }
 }
