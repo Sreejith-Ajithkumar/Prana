@@ -1,22 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../data/food_preferences_storage.dart';
 import '../../data/food_repository_factory.dart';
+import '../../data/persistent_custom_food_repository.dart';
 import '../../domain/entities/catalog_food.dart';
+import '../../domain/repositories/custom_food_repository.dart';
 import '../../domain/repositories/food_preferences_repository.dart';
 import '../../domain/repositories/food_repository.dart';
 import '../../domain/services/food_discovery_service.dart';
+import 'custom_food_screen.dart';
 
 class FoodSearchScreen extends StatefulWidget {
   const FoodSearchScreen({
     super.key,
     this.repository,
     this.preferencesRepository,
+    this.customFoodRepository,
   });
 
   final FoodRepository? repository;
   final FoodPreferencesRepository? preferencesRepository;
+  final CustomFoodRepository? customFoodRepository;
 
   @override
   State<FoodSearchScreen> createState() => _FoodSearchScreenState();
@@ -27,6 +31,11 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   late final FoodRepository _repository;
   late final FoodPreferencesRepository _preferencesRepository;
+  CustomFoodRepository get _customFoodRepository {
+    return widget.customFoodRepository ??
+        PersistentCustomFoodRepository.instance;
+  }
+
   late final FoodDiscoveryService _discoveryService;
 
   List<CatalogFood> _results = [];
@@ -44,6 +53,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     super.initState();
 
     _repository = widget.repository ?? createFoodRepository();
+
     _preferencesRepository =
         widget.preferencesRepository ?? FoodPreferencesStorage.instance;
 
@@ -136,7 +146,42 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   void _selectFood(CatalogFood food) {
-    context.pop(food);
+    Navigator.of(context).pop(food);
+  }
+
+  Future<void> _createCustomFood() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) {
+          return CustomFoodScreen(repository: _customFoodRepository);
+        },
+      ),
+    );
+
+    if (!mounted || changed != true) {
+      return;
+    }
+
+    await _searchFoods(_searchController.text);
+  }
+
+  Future<void> _editCustomFood(CatalogFood food) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) {
+          return CustomFoodScreen(
+            food: food,
+            repository: _customFoodRepository,
+          );
+        },
+      ),
+    );
+
+    if (!mounted || changed != true) {
+      return;
+    }
+
+    await _searchFoods(_searchController.text);
   }
 
   Future<void> _toggleFavorite(CatalogFood food) async {
@@ -230,15 +275,24 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Select a food to automatically fill its '
-                  'nutrition information.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Select a food to automatically fill its '
+                      'nutrition information.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  OutlinedButton.icon(
+                    onPressed: _createCustomFood,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Custom'),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
@@ -344,6 +398,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       isUpdatingFavorite: _favoriteUpdates.contains(food.identityKey),
       onTap: () => _selectFood(food),
       onFavoriteToggle: () => _toggleFavorite(food),
+      onEdit: food.source == CatalogFoodSource.custom
+          ? () => _editCustomFood(food)
+          : null,
     );
   }
 }
@@ -381,6 +438,7 @@ class _FoodResultCard extends StatelessWidget {
     required this.isUpdatingFavorite,
     required this.onTap,
     required this.onFavoriteToggle,
+    this.onEdit,
   });
 
   final CatalogFood food;
@@ -388,6 +446,7 @@ class _FoodResultCard extends StatelessWidget {
   final bool isUpdatingFavorite;
   final VoidCallback onTap;
   final VoidCallback onFavoriteToggle;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -443,17 +502,30 @@ class _FoodResultCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  IconButton(
-                    tooltip: isFavorite
-                        ? 'Remove ${food.name} from favorites'
-                        : 'Add ${food.name} to favorites',
-                    onPressed: isUpdatingFavorite ? null : onFavoriteToggle,
-                    icon: isUpdatingFavorite
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(isFavorite ? Icons.star : Icons.star_border),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onEdit != null)
+                        IconButton(
+                          tooltip: 'Edit ${food.name}',
+                          onPressed: onEdit,
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
+                      IconButton(
+                        tooltip: isFavorite
+                            ? 'Remove ${food.name} from favorites'
+                            : 'Add ${food.name} to favorites',
+                        onPressed: isUpdatingFavorite ? null : onFavoriteToggle,
+                        icon: isUpdatingFavorite
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(isFavorite ? Icons.star : Icons.star_border),
+                      ),
+                    ],
                   ),
                   Text(
                     '${_formatNumber(food.calories)} kcal',
@@ -553,7 +625,7 @@ class _NoResults extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Try another search or enter the food manually.',
+              'Try another search or create a custom food.',
               textAlign: TextAlign.center,
             ),
           ],

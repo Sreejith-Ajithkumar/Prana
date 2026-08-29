@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/features/meal_tracking/domain/entities/catalog_food.dart';
+import 'package:mobile/features/meal_tracking/domain/entities/custom_food_draft.dart';
 import 'package:mobile/features/meal_tracking/domain/entities/recent_food_reference.dart';
+import 'package:mobile/features/meal_tracking/domain/repositories/custom_food_repository.dart';
 import 'package:mobile/features/meal_tracking/domain/repositories/food_preferences_repository.dart';
 import 'package:mobile/features/meal_tracking/domain/repositories/food_repository.dart';
 import 'package:mobile/features/meal_tracking/presentation/screens/food_search_screen.dart';
@@ -62,7 +64,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      await tester.enterText(find.byType(EditableText), 'banana');
+      await tester.enterText(find.byType(EditableText).first, 'banana');
       await tester.pumpAndSettle();
 
       expect(repository.queries, contains('banana'));
@@ -160,6 +162,51 @@ void main() {
       expect(preferences.favorites, contains(banana.identityKey));
       expect(find.byTooltip('Remove Banana from favorites'), findsOneWidget);
     });
+
+    testWidgets('shows the custom food creation action', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: FakeFoodRepository(foods: const []),
+            preferencesRepository: FakeFoodPreferencesRepository(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(OutlinedButton, 'Custom'), findsOneWidget);
+    });
+
+    testWidgets('custom food results expose an edit action', (tester) async {
+      final customFood = const CatalogFood(
+        id: 'custom-1',
+        name: 'My oats',
+        servingDescription: '1 bowl',
+        servingQuantity: 1,
+        servingUnit: 'bowl',
+        calories: 350,
+        proteinGrams: 20,
+        carbohydrateGrams: 40,
+        fatGrams: 10,
+        source: CatalogFoodSource.custom,
+        providerId: 'prana-custom',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: FakeFoodRepository(foods: [customFood]),
+            preferencesRepository: FakeFoodPreferencesRepository(),
+            customFoodRepository: FakeCustomFoodRepository(foods: [customFood]),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Edit My oats'), findsOneWidget);
+    });
   });
 }
 
@@ -219,6 +266,27 @@ class FakeFoodRepository implements FoodRepository {
 
     return null;
   }
+}
+
+class FakeCustomFoodRepository extends FakeFoodRepository
+    implements CustomFoodRepository {
+  FakeCustomFoodRepository({required super.foods});
+
+  @override
+  Future<CatalogFood> createCustomFood(CustomFoodDraft draft) async {
+    return draft.toCatalogFood(id: 'custom-created');
+  }
+
+  @override
+  Future<CatalogFood> updateCustomFood(
+    String identityKey,
+    CustomFoodDraft draft,
+  ) async {
+    return draft.toCatalogFood(id: 'custom-updated');
+  }
+
+  @override
+  Future<void> deleteCustomFood(String identityKey) async {}
 }
 
 class FakeFoodPreferencesRepository implements FoodPreferencesRepository {
