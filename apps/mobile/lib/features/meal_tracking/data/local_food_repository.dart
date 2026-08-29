@@ -1,8 +1,11 @@
 import '../domain/entities/catalog_food.dart';
 import '../domain/repositories/food_repository.dart';
+import '../domain/services/food_search_ranker.dart';
 
 class LocalFoodRepository implements FoodRepository {
-  const LocalFoodRepository();
+  const LocalFoodRepository({this.searchRanker = const FoodSearchRanker()});
+
+  final FoodSearchRanker searchRanker;
 
   static const List<CatalogFood> _foods = [
     CatalogFood(
@@ -15,6 +18,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 0,
       carbohydrateGrams: 0.5,
       fatGrams: 0,
+      searchTerms: ['tea', 'unsweetened tea'],
     ),
     CatalogFood(
       id: 'tea-milk-sugar',
@@ -26,6 +30,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 2,
       carbohydrateGrams: 15,
       fatGrams: 2.5,
+      searchTerms: ['milk tea', 'sweet tea', 'chai'],
     ),
     CatalogFood(
       id: 'masala-chai',
@@ -37,6 +42,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 3,
       carbohydrateGrams: 20,
       fatGrams: 3,
+      searchTerms: ['chai', 'tea', 'spiced tea', 'indian tea'],
     ),
     CatalogFood(
       id: 'boiled-egg',
@@ -48,6 +54,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 6.3,
       carbohydrateGrams: 0.6,
       fatGrams: 5.3,
+      searchTerms: ['egg', 'hard boiled egg'],
     ),
     CatalogFood(
       id: 'banana',
@@ -59,6 +66,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 1.3,
       carbohydrateGrams: 27,
       fatGrams: 0.4,
+      searchTerms: ['fruit'],
     ),
     CatalogFood(
       id: 'apple',
@@ -70,6 +78,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 0.5,
       carbohydrateGrams: 25,
       fatGrams: 0.3,
+      searchTerms: ['fruit'],
     ),
     CatalogFood(
       id: 'white-rice',
@@ -81,6 +90,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 4.3,
       carbohydrateGrams: 44.5,
       fatGrams: 0.4,
+      searchTerms: ['rice', 'white rice', 'steamed rice'],
     ),
     CatalogFood(
       id: 'chicken-breast',
@@ -92,6 +102,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 31,
       carbohydrateGrams: 0,
       fatGrams: 3.6,
+      searchTerms: ['chicken', 'breast'],
     ),
     CatalogFood(
       id: 'chicken-wings',
@@ -103,6 +114,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 30.5,
       carbohydrateGrams: 0,
       fatGrams: 8.1,
+      searchTerms: ['chicken', 'wings'],
     ),
     CatalogFood(
       id: 'whole-milk',
@@ -114,6 +126,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 7.7,
       carbohydrateGrams: 11.7,
       fatGrams: 7.9,
+      searchTerms: ['milk', 'dairy', 'full fat milk'],
     ),
     CatalogFood(
       id: 'plain-yogurt',
@@ -125,6 +138,7 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 8.5,
       carbohydrateGrams: 11.4,
       fatGrams: 8,
+      searchTerms: ['yogurt', 'curd', 'dahi'],
     ),
     CatalogFood(
       id: 'oatmeal',
@@ -136,20 +150,13 @@ class LocalFoodRepository implements FoodRepository {
       proteinGrams: 6,
       carbohydrateGrams: 27,
       fatGrams: 2.6,
+      searchTerms: ['oats', 'porridge'],
     ),
   ];
 
   @override
   Future<List<CatalogFood>> searchFoods(String query) async {
-    final normalizedQuery = query.trim().toLowerCase();
-
-    if (normalizedQuery.isEmpty) {
-      return _foods;
-    }
-
-    return _foods.where((food) {
-      return food.name.toLowerCase().contains(normalizedQuery);
-    }).toList();
+    return searchRanker.search(_foods, query);
   }
 
   @override

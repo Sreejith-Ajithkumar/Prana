@@ -18,14 +18,35 @@ void main() {
       expect(results.every((food) => food.providerId == 'prana-local'), isTrue);
     });
 
-    test('search is trimmed and case insensitive', () async {
-      final results = await repository.searchFoods('  CHICKEN  ');
+    test('search is normalized and case insensitive', () async {
+      final results = await repository.searchFoods('  COOKED---CHICKEN  ');
 
-      expect(
-        results.map((food) => food.id),
-        containsAll(['chicken-breast', 'chicken-wings']),
-      );
-      expect(results, hasLength(2));
+      expect(results.map((food) => food.id).toList(), [
+        'chicken-breast',
+        'chicken-wings',
+      ]);
+    });
+
+    test('ranks visible tea names ahead of alias-only matches', () async {
+      final results = await repository.searchFoods('tea');
+
+      expect(results.map((food) => food.id).toList(), [
+        'tea-milk-sugar',
+        'black-tea',
+        'masala-chai',
+      ]);
+    });
+
+    test('finds regional alias dahi for plain yogurt', () async {
+      final results = await repository.searchFoods('dahi');
+
+      expect(results.single.id, 'plain-yogurt');
+    });
+
+    test('finds common alias oats for oatmeal', () async {
+      final results = await repository.searchFoods('oats');
+
+      expect(results.single.id, 'oatmeal');
     });
 
     test('findFoodById returns a matching food', () async {

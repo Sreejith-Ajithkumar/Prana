@@ -15,6 +15,7 @@ class CatalogFood {
     this.providerId = 'prana-local',
     this.brand,
     this.barcode,
+    this.searchTerms = const [],
   });
 
   /// Provider-native identifier for this food.
@@ -50,6 +51,12 @@ class CatalogFood {
 
   /// Optional UPC/EAN-style barcode value when one is available.
   final String? barcode;
+
+  /// Optional aliases and regional/common search terms.
+  ///
+  /// These improve discovery without changing the canonical food name.
+  /// Examples include "dahi" for plain yogurt or "oats" for oatmeal.
+  final List<String> searchTerms;
 
   /// Provider-aware identity used for deduplication and future persistence.
   String get identityKey => '${source.name}:$providerId:$id';
