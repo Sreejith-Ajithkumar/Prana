@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/food_preferences_storage.dart';
 import '../../data/food_repository_factory.dart';
 import '../../domain/entities/catalog_food.dart';
+import '../../domain/repositories/food_preferences_repository.dart';
 import '../../domain/repositories/food_repository.dart';
+import '../../domain/services/food_discovery_service.dart';
 
 class FoodSearchScreen extends StatefulWidget {
-  const FoodSearchScreen({super.key, this.repository});
+  const FoodSearchScreen({
+    super.key,
+    this.repository,
+    this.preferencesRepository,
+  });
 
   final FoodRepository? repository;
+  final FoodPreferencesRepository? preferencesRepository;
 
   @override
   State<FoodSearchScreen> createState() => _FoodSearchScreenState();
@@ -18,8 +26,15 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   final _searchController = TextEditingController();
 
   late final FoodRepository _repository;
+  late final FoodPreferencesRepository _preferencesRepository;
+  late final FoodDiscoveryService _discoveryService;
 
   List<CatalogFood> _results = [];
+  List<CatalogFood> _favorites = [];
+  List<CatalogFood> _recents = [];
+  Set<String> _favoriteIdentityKeys = <String>{};
+  final Set<String> _favoriteUpdates = <String>{};
+
   bool _isLoading = true;
   String? _errorMessage;
   int _searchRevision = 0;
@@ -29,6 +44,14 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     super.initState();
 
     _repository = widget.repository ?? createFoodRepository();
+    _preferencesRepository =
+        widget.preferencesRepository ?? FoodPreferencesStorage.instance;
+
+    _discoveryService = FoodDiscoveryService(
+      foodRepository: _repository,
+      preferencesRepository: _preferencesRepository,
+    );
+
     _searchFoods('');
   }
 
@@ -40,6 +63,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   Future<void> _searchFoods(String query) async {
     final revision = ++_searchRevision;
+    final isOverview = query.trim().isEmpty;
 
     setState(() {
       _isLoading = true;
@@ -49,12 +73,31 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     try {
       final results = await _repository.searchFoods(query);
 
+      FoodDiscoveryOverview? overview;
+      Set<String>? favoriteIdentityKeys;
+
+      if (isOverview) {
+        overview = await _discoveryService.loadOverview();
+      } else {
+        favoriteIdentityKeys = await _preferencesRepository
+            .loadFavoriteIdentityKeys();
+      }
+
       if (!mounted || revision != _searchRevision) {
         return;
       }
 
       setState(() {
         _results = results;
+
+        if (overview != null) {
+          _favorites = overview.favorites;
+          _recents = overview.recents;
+          _favoriteIdentityKeys = overview.favoriteIdentityKeys;
+        } else if (favoriteIdentityKeys != null) {
+          _favoriteIdentityKeys = favoriteIdentityKeys;
+        }
+
         _isLoading = false;
       });
     } catch (_) {
@@ -70,8 +113,88 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     }
   }
 
+  Future<void> _refreshOverview() async {
+    if (_searchController.text.trim().isNotEmpty) {
+      return;
+    }
+
+    try {
+      final overview = await _discoveryService.loadOverview();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _favorites = overview.favorites;
+        _recents = overview.recents;
+        _favoriteIdentityKeys = overview.favoriteIdentityKeys;
+      });
+    } catch (_) {
+      // Search results remain usable even if preference refresh fails.
+    }
+  }
+
   void _selectFood(CatalogFood food) {
     context.pop(food);
+  }
+
+  Future<void> _toggleFavorite(CatalogFood food) async {
+    final identityKey = food.identityKey;
+
+    if (_favoriteUpdates.contains(identityKey)) {
+      return;
+    }
+
+    final wasFavorite = _favoriteIdentityKeys.contains(identityKey);
+    final shouldBeFavorite = !wasFavorite;
+
+    setState(() {
+      _favoriteUpdates.add(identityKey);
+
+      if (shouldBeFavorite) {
+        _favoriteIdentityKeys = {..._favoriteIdentityKeys, identityKey};
+      } else {
+        _favoriteIdentityKeys = {
+          ..._favoriteIdentityKeys.where((value) => value != identityKey),
+        };
+      }
+    });
+
+    try {
+      await _preferencesRepository.setFavorite(
+        identityKey,
+        isFavorite: shouldBeFavorite,
+      );
+
+      await _refreshOverview();
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        if (wasFavorite) {
+          _favoriteIdentityKeys = {..._favoriteIdentityKeys, identityKey};
+        } else {
+          _favoriteIdentityKeys = {
+            ..._favoriteIdentityKeys.where((value) => value != identityKey),
+          };
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Prana could not update this favorite right now.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _favoriteUpdates.remove(identityKey);
+        });
+      }
+    }
   }
 
   @override
@@ -119,14 +242,14 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Expanded(child: _buildResults()),
+            Expanded(child: _buildContent()),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildResults() {
+  Widget _buildContent() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -138,30 +261,133 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
       );
     }
 
-    if (_results.isEmpty) {
-      return const _NoResults();
+    if (_searchController.text.trim().isNotEmpty) {
+      if (_results.isEmpty) {
+        return const _NoResults();
+      }
+
+      return _buildSearchResults();
     }
 
+    return _buildOverview();
+  }
+
+  Widget _buildSearchResults() {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
       itemCount: _results.length,
-      separatorBuilder: (_, _) {
-        return const SizedBox(height: 8);
-      },
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final food = _results[index];
 
-        return _FoodResultCard(food: food, onTap: () => _selectFood(food));
+        return _buildFoodCard(food);
       },
+    );
+  }
+
+  Widget _buildOverview() {
+    final featuredIdentityKeys = <String>{
+      ..._favorites.map((food) => food.identityKey),
+      ..._recents.map((food) => food.identityKey),
+    };
+
+    final allFoods = _results
+        .where((food) => !featuredIdentityKeys.contains(food.identityKey))
+        .toList(growable: false);
+
+    if (_favorites.isEmpty && _recents.isEmpty && allFoods.isEmpty) {
+      return const _NoResults();
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      children: [
+        if (_favorites.isNotEmpty) ...[
+          const _SectionHeader(icon: Icons.star_outline, title: 'Favorites'),
+          ..._sectionCards(_favorites),
+          const SizedBox(height: 20),
+        ],
+        if (_recents.isNotEmpty) ...[
+          const _SectionHeader(icon: Icons.history, title: 'Recently used'),
+          ..._sectionCards(_recents),
+          const SizedBox(height: 20),
+        ],
+        if (allFoods.isNotEmpty) ...[
+          const _SectionHeader(
+            icon: Icons.restaurant_menu_outlined,
+            title: 'All foods',
+          ),
+          ..._sectionCards(allFoods),
+        ],
+      ],
+    );
+  }
+
+  List<Widget> _sectionCards(List<CatalogFood> foods) {
+    final widgets = <Widget>[];
+
+    for (var index = 0; index < foods.length; index++) {
+      if (index > 0) {
+        widgets.add(const SizedBox(height: 8));
+      }
+
+      widgets.add(_buildFoodCard(foods[index]));
+    }
+
+    return widgets;
+  }
+
+  Widget _buildFoodCard(CatalogFood food) {
+    return _FoodResultCard(
+      food: food,
+      isFavorite: _favoriteIdentityKeys.contains(food.identityKey),
+      isUpdatingFavorite: _favoriteUpdates.contains(food.identityKey),
+      onTap: () => _selectFood(food),
+      onFavoriteToggle: () => _toggleFavorite(food),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.icon, required this.title});
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _FoodResultCard extends StatelessWidget {
-  const _FoodResultCard({required this.food, required this.onTap});
+  const _FoodResultCard({
+    required this.food,
+    required this.isFavorite,
+    required this.isUpdatingFavorite,
+    required this.onTap,
+    required this.onFavoriteToggle,
+  });
 
   final CatalogFood food;
+  final bool isFavorite;
+  final bool isUpdatingFavorite;
   final VoidCallback onTap;
+  final VoidCallback onFavoriteToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +398,7 @@ class _FoodResultCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
           child: Row(
             children: [
               const CircleAvatar(child: Icon(Icons.restaurant_outlined)),
@@ -204,26 +430,38 @@ class _FoodResultCard extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       '${_formatNumber(food.proteinGrams)} g protein'
-                      ' \u2022 '
+                      ' • '
                       '${_formatNumber(food.carbohydrateGrams)} g carbs'
-                      ' \u2022 '
+                      ' • '
                       '${_formatNumber(food.fatGrams)} g fat',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  IconButton(
+                    tooltip: isFavorite
+                        ? 'Remove ${food.name} from favorites'
+                        : 'Add ${food.name} to favorites',
+                    onPressed: isUpdatingFavorite ? null : onFavoriteToggle,
+                    icon: isUpdatingFavorite
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(isFavorite ? Icons.star : Icons.star_border),
+                  ),
                   Text(
                     '${_formatNumber(food.calories)} kcal',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   const Icon(Icons.chevron_right),
                 ],
               ),

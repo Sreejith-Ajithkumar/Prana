@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mobile/features/meal_tracking/domain/entities/catalog_food.dart';
+import 'package:mobile/features/meal_tracking/domain/entities/recent_food_reference.dart';
+import 'package:mobile/features/meal_tracking/domain/repositories/food_preferences_repository.dart';
 import 'package:mobile/features/meal_tracking/domain/repositories/food_repository.dart';
 import 'package:mobile/features/meal_tracking/presentation/screens/food_search_screen.dart';
 
@@ -28,7 +30,12 @@ void main() {
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: FoodSearchScreen(repository: repository)),
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: repository,
+            preferencesRepository: FakeFoodPreferencesRepository(),
+          ),
+        ),
       );
 
       await tester.pumpAndSettle();
@@ -45,7 +52,12 @@ void main() {
       final repository = FakeFoodRepository(foods: const []);
 
       await tester.pumpWidget(
-        MaterialApp(home: FoodSearchScreen(repository: repository)),
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: repository,
+            preferencesRepository: FakeFoodPreferencesRepository(),
+          ),
+        ),
       );
 
       await tester.pumpAndSettle();
@@ -60,8 +72,11 @@ void main() {
       tester,
     ) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          home: FoodSearchScreen(repository: ThrowingFoodRepository()),
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: const ThrowingFoodRepository(),
+            preferencesRepository: FakeFoodPreferencesRepository(),
+          ),
         ),
       );
 
@@ -73,7 +88,93 @@ void main() {
       );
       expect(find.text('Try again'), findsOneWidget);
     });
+
+    testWidgets('shows favorites before all foods for an empty query', (
+      tester,
+    ) async {
+      final banana = _food(id: 'banana', name: 'Banana');
+      final apple = _food(id: 'apple', name: 'Apple');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: FakeFoodRepository(foods: [banana, apple]),
+            preferencesRepository: FakeFoodPreferencesRepository(
+              favorites: {banana.identityKey},
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Favorites'), findsOneWidget);
+      expect(find.text('All foods'), findsOneWidget);
+      expect(find.text('Banana'), findsOneWidget);
+      expect(find.text('Apple'), findsOneWidget);
+    });
+
+    testWidgets('shows recently used foods for an empty query', (tester) async {
+      final banana = _food(id: 'banana', name: 'Banana');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: FakeFoodRepository(foods: [banana]),
+            preferencesRepository: FakeFoodPreferencesRepository(
+              recents: [
+                RecentFoodReference(
+                  identityKey: banana.identityKey,
+                  usedAt: DateTime.utc(2026, 8, 29, 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recently used'), findsOneWidget);
+      expect(find.text('Banana'), findsOneWidget);
+    });
+
+    testWidgets('favorite button persists the selected food', (tester) async {
+      final banana = _food(id: 'banana', name: 'Banana');
+      final preferences = FakeFoodPreferencesRepository();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: FakeFoodRepository(foods: [banana]),
+            preferencesRepository: preferences,
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Add Banana to favorites'));
+      await tester.pumpAndSettle();
+
+      expect(preferences.favorites, contains(banana.identityKey));
+      expect(find.byTooltip('Remove Banana from favorites'), findsOneWidget);
+    });
   });
+}
+
+CatalogFood _food({required String id, required String name}) {
+  return CatalogFood(
+    id: id,
+    name: name,
+    servingDescription: '1 serving',
+    servingQuantity: 1,
+    servingUnit: 'serving',
+    calories: 100,
+    proteinGrams: 5,
+    carbohydrateGrams: 10,
+    fatGrams: 4,
+  );
 }
 
 class FakeFoodRepository implements FoodRepository {
@@ -117,6 +218,51 @@ class FakeFoodRepository implements FoodRepository {
     }
 
     return null;
+  }
+}
+
+class FakeFoodPreferencesRepository implements FoodPreferencesRepository {
+  FakeFoodPreferencesRepository({
+    Set<String>? favorites,
+    List<RecentFoodReference>? recents,
+  }) : favorites = favorites ?? <String>{},
+       recents = recents ?? <RecentFoodReference>[];
+
+  final Set<String> favorites;
+  final List<RecentFoodReference> recents;
+
+  @override
+  Future<Set<String>> loadFavoriteIdentityKeys() async {
+    return {...favorites};
+  }
+
+  @override
+  Future<List<RecentFoodReference>> loadRecents() async {
+    return [...recents];
+  }
+
+  @override
+  Future<void> recordRecent(String identityKey, {DateTime? usedAt}) async {
+    recents.removeWhere((record) => record.identityKey == identityKey);
+    recents.insert(
+      0,
+      RecentFoodReference(
+        identityKey: identityKey,
+        usedAt: usedAt ?? DateTime.now(),
+      ),
+    );
+  }
+
+  @override
+  Future<void> setFavorite(
+    String identityKey, {
+    required bool isFavorite,
+  }) async {
+    if (isFavorite) {
+      favorites.add(identityKey);
+    } else {
+      favorites.remove(identityKey);
+    }
   }
 }
 

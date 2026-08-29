@@ -2,14 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/food_preferences_storage.dart';
 import '../../data/meal_storage.dart';
 import '../../domain/entities/catalog_food.dart';
 import '../../domain/entities/food_entry.dart';
 import '../../domain/entities/meal_entry.dart';
 import '../../domain/enums/meal_type.dart';
 
+typedef SaveMealAction = Future<void> Function(MealEntry meal);
+typedef RecordRecentFoodAction = Future<void> Function(CatalogFood food);
+typedef SearchFoodAction = Future<CatalogFood?> Function();
+
 class AddMealScreen extends StatefulWidget {
-  const AddMealScreen({super.key});
+  const AddMealScreen({
+    super.key,
+    this.saveMealAction,
+    this.recordRecentFoodAction,
+    this.searchFoodAction,
+  });
+
+  final SaveMealAction? saveMealAction;
+  final RecordRecentFoodAction? recordRecentFoodAction;
+  final SearchFoodAction? searchFoodAction;
 
   @override
   State<AddMealScreen> createState() => _AddMealScreenState();
@@ -87,7 +101,29 @@ class _AddMealScreenState extends State<AddMealScreen> {
         foods: [food],
       );
 
-      await MealStorage.instance.addMeal(meal);
+      final saveMealAction =
+          widget.saveMealAction ?? MealStorage.instance.addMeal;
+
+      await saveMealAction(meal);
+
+      final selectedCatalogFood = _selectedCatalogFood;
+
+      if (selectedCatalogFood != null) {
+        final recordRecentFoodAction =
+            widget.recordRecentFoodAction ??
+            (CatalogFood selectedFood) {
+              return FoodPreferencesStorage.instance.recordRecent(
+                selectedFood.identityKey,
+              );
+            };
+
+        try {
+          await recordRecentFoodAction(selectedCatalogFood);
+        } catch (_) {
+          // Meal logging is the primary action. A non-critical recents update
+          // must never make an already-saved meal look like it failed.
+        }
+      }
 
       if (!mounted) {
         return;
@@ -154,7 +190,11 @@ class _AddMealScreenState extends State<AddMealScreen> {
   }
 
   Future<void> _searchFood() async {
-    final selectedFood = await context.push<CatalogFood>('/foods/search');
+    final searchFoodAction =
+        widget.searchFoodAction ??
+        () => context.push<CatalogFood>('/foods/search');
+
+    final selectedFood = await searchFoodAction();
 
     if (!mounted || selectedFood == null) {
       return;
