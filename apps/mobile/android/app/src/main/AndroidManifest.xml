@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Barcode scanning: camera access is used only while the scanner is open. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <!-- Health Connect: read-only permissions used by Prana in Sprint 7 -->
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />

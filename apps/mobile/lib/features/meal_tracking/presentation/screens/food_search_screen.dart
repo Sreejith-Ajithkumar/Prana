@@ -4,10 +4,12 @@ import '../../data/food_preferences_storage.dart';
 import '../../data/food_repository_factory.dart';
 import '../../data/persistent_custom_food_repository.dart';
 import '../../domain/entities/catalog_food.dart';
+import '../../domain/entities/product_barcode.dart';
 import '../../domain/repositories/custom_food_repository.dart';
 import '../../domain/repositories/food_preferences_repository.dart';
 import '../../domain/repositories/food_repository.dart';
 import '../../domain/services/food_discovery_service.dart';
+import 'barcode_scanner_screen.dart';
 import 'custom_food_screen.dart';
 
 class FoodSearchScreen extends StatefulWidget {
@@ -31,6 +33,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   late final FoodRepository _repository;
   late final FoodPreferencesRepository _preferencesRepository;
+
   CustomFoodRepository get _customFoodRepository {
     return widget.customFoodRepository ??
         PersistentCustomFoodRepository.instance;
@@ -43,6 +46,8 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   List<CatalogFood> _recents = [];
   Set<String> _favoriteIdentityKeys = <String>{};
   final Set<String> _favoriteUpdates = <String>{};
+
+  ProductBarcode? _lastScannedBarcode;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -149,6 +154,24 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     Navigator.of(context).pop(food);
   }
 
+  Future<void> _scanBarcode() async {
+    final barcode = await Navigator.of(context).push<ProductBarcode>(
+      MaterialPageRoute(
+        builder: (context) {
+          return const BarcodeScannerScreen();
+        },
+      ),
+    );
+
+    if (!mounted || barcode == null) {
+      return;
+    }
+
+    setState(() {
+      _lastScannedBarcode = barcode;
+    });
+  }
+
   Future<void> _createCustomFood() async {
     final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -244,6 +267,8 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lastScannedBarcode = _lastScannedBarcode;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Search food')),
       body: SafeArea(
@@ -275,23 +300,57 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Select a food to automatically fill its '
-                      'nutrition information.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  Text(
+                    'Select a food to automatically fill its '
+                    'nutrition information.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  OutlinedButton.icon(
-                    onPressed: _createCustomFood,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Custom'),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _scanBarcode,
+                        icon: const Icon(Icons.qr_code_scanner),
+                        label: const Text('Scan barcode'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _createCustomFood,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Custom'),
+                      ),
+                    ],
                   ),
+                  if (lastScannedBarcode != null) ...[
+                    const SizedBox(height: 12),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle_outline),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                '${lastScannedBarcode.formatLabel} '
+                                '${lastScannedBarcode.value} scanned. '
+                                'Product lookup is coming in the next phase.',
+                                key: const ValueKey(
+                                  'last-scanned-barcode-message',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

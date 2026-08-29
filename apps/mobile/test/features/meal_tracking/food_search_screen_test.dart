@@ -178,6 +178,24 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, 'Custom'), findsOneWidget);
     });
 
+    testWidgets('shows the barcode scanning action', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: FoodSearchScreen(
+            repository: FakeFoodRepository(foods: const []),
+            preferencesRepository: FakeFoodPreferencesRepository(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(
+        find.widgetWithText(OutlinedButton, 'Scan barcode'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('custom food results expose an edit action', (tester) async {
       final customFood = const CatalogFood(
         id: 'custom-1',
