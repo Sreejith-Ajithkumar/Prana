@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../data/barcode_food_provider_factory.dart';
 import '../../data/food_preferences_storage.dart';
 import '../../data/food_repository_factory.dart';
 import '../../data/persistent_custom_food_repository.dart';
+import '../../domain/entities/barcode_lookup_result.dart';
 import '../../domain/entities/catalog_food.dart';
 import '../../domain/entities/product_barcode.dart';
+import '../../domain/repositories/barcode_food_provider.dart';
 import '../../domain/repositories/custom_food_repository.dart';
 import '../../domain/repositories/food_preferences_repository.dart';
 import '../../domain/repositories/food_repository.dart';
@@ -12,17 +15,24 @@ import '../../domain/services/food_discovery_service.dart';
 import 'barcode_scanner_screen.dart';
 import 'custom_food_screen.dart';
 
+typedef BarcodeScanAction =
+    Future<ProductBarcode?> Function(BuildContext context);
+
 class FoodSearchScreen extends StatefulWidget {
   const FoodSearchScreen({
     super.key,
     this.repository,
     this.preferencesRepository,
     this.customFoodRepository,
+    this.barcodeFoodProvider,
+    this.barcodeScanAction,
   });
 
   final FoodRepository? repository;
   final FoodPreferencesRepository? preferencesRepository;
   final CustomFoodRepository? customFoodRepository;
+  final BarcodeFoodProvider? barcodeFoodProvider;
+  final BarcodeScanAction? barcodeScanAction;
 
   @override
   State<FoodSearchScreen> createState() => _FoodSearchScreenState();
@@ -33,6 +43,8 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   late final FoodRepository _repository;
   late final FoodPreferencesRepository _preferencesRepository;
+  late final BarcodeFoodProvider _barcodeFoodProvider;
+  late final bool _ownsBarcodeFoodProvider;
 
   CustomFoodRepository get _customFoodRepository {
     return widget.customFoodRepository ??
@@ -48,10 +60,13 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   final Set<String> _favoriteUpdates = <String>{};
 
   ProductBarcode? _lastScannedBarcode;
+  BarcodeLookupResult? _barcodeLookupResult;
 
   bool _isLoading = true;
+  bool _isLookingUpBarcode = false;
   String? _errorMessage;
   int _searchRevision = 0;
+  int _barcodeLookupRevision = 0;
 
   @override
   void initState() {
@@ -61,6 +76,10 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
     _preferencesRepository =
         widget.preferencesRepository ?? FoodPreferencesStorage.instance;
+
+    _ownsBarcodeFoodProvider = widget.barcodeFoodProvider == null;
+    _barcodeFoodProvider =
+        widget.barcodeFoodProvider ?? createBarcodeFoodProvider();
 
     _discoveryService = FoodDiscoveryService(
       foodRepository: _repository,
@@ -73,6 +92,11 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+
+    if (_ownsBarcodeFoodProvider) {
+      _barcodeFoodProvider.close();
+    }
+
     super.dispose();
   }
 
@@ -155,20 +179,55 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   Future<void> _scanBarcode() async {
-    final barcode = await Navigator.of(context).push<ProductBarcode>(
-      MaterialPageRoute(
-        builder: (context) {
-          return const BarcodeScannerScreen();
-        },
-      ),
-    );
+    final scanAction =
+        widget.barcodeScanAction ??
+        (BuildContext context) {
+          return Navigator.of(context).push<ProductBarcode>(
+            MaterialPageRoute(
+              builder: (context) {
+                return const BarcodeScannerScreen();
+              },
+            ),
+          );
+        };
+
+    final barcode = await scanAction(context);
 
     if (!mounted || barcode == null) {
       return;
     }
 
+    await _lookupBarcode(barcode);
+  }
+
+  Future<void> _retryBarcodeLookup() async {
+    final barcode = _lastScannedBarcode;
+
+    if (barcode == null) {
+      return;
+    }
+
+    await _lookupBarcode(barcode);
+  }
+
+  Future<void> _lookupBarcode(ProductBarcode barcode) async {
+    final revision = ++_barcodeLookupRevision;
+
     setState(() {
       _lastScannedBarcode = barcode;
+      _barcodeLookupResult = null;
+      _isLookingUpBarcode = true;
+    });
+
+    final result = await _barcodeFoodProvider.lookup(barcode);
+
+    if (!mounted || revision != _barcodeLookupRevision) {
+      return;
+    }
+
+    setState(() {
+      _barcodeLookupResult = result;
+      _isLookingUpBarcode = false;
     });
   }
 
@@ -267,8 +326,6 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final lastScannedBarcode = _lastScannedBarcode;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Search food')),
       body: SafeArea(
@@ -316,7 +373,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                     runSpacing: 8,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: _scanBarcode,
+                        onPressed: _isLookingUpBarcode ? null : _scanBarcode,
                         icon: const Icon(Icons.qr_code_scanner),
                         label: const Text('Scan barcode'),
                       ),
@@ -327,35 +384,185 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
                       ),
                     ],
                   ),
-                  if (lastScannedBarcode != null) ...[
+                  if (_isLookingUpBarcode || _barcodeLookupResult != null) ...[
                     const SizedBox(height: 12),
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle_outline),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                '${lastScannedBarcode.formatLabel} '
-                                '${lastScannedBarcode.value} scanned. '
-                                'Product lookup is coming in the next phase.',
-                                key: const ValueKey(
-                                  'last-scanned-barcode-message',
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    _buildBarcodeLookupCard(),
                   ],
                 ],
               ),
             ),
             const SizedBox(height: 12),
             Expanded(child: _buildContent()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBarcodeLookupCard() {
+    if (_isLookingUpBarcode) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              SizedBox.square(
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Text('Looking up this product…')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final result = _barcodeLookupResult;
+
+    if (result is BarcodeLookupSuccess) {
+      final food = result.food;
+
+      return Card(
+        key: const ValueKey('barcode-lookup-success'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.check_circle_outline),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          food.name,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (food.brand != null) ...[
+                          const SizedBox(height: 2),
+                          Text(food.brand!),
+                        ],
+                        const SizedBox(height: 6),
+                        Text(
+                          '${food.servingDescription} • '
+                          '${_formatNumber(food.calories)} kcal',
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_formatNumber(food.proteinGrams)} g protein'
+                          ' • '
+                          '${_formatNumber(food.carbohydrateGrams)} g carbs'
+                          ' • '
+                          '${_formatNumber(food.fatGrams)} g fat',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Data: Open Food Facts',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: () => _selectFood(food),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Use food'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (result is BarcodeLookupNotFound) {
+      return Card(
+        key: const ValueKey('barcode-lookup-not-found'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.search_off),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'This barcode was valid, but the product was not found '
+                  'in Open Food Facts.',
+                ),
+              ),
+              TextButton(
+                onPressed: _createCustomFood,
+                child: const Text('Custom'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (result is BarcodeLookupIncomplete) {
+      final productName = result.productName;
+
+      return Card(
+        key: const ValueKey('barcode-lookup-incomplete'),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  productName == null
+                      ? 'The product exists, but it does not have enough '
+                            'nutrition data to use safely.'
+                      : '$productName was found, but its nutrition data is '
+                            'incomplete.',
+                ),
+              ),
+              TextButton(
+                onPressed: _createCustomFood,
+                child: const Text('Custom'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      key: const ValueKey('barcode-lookup-unavailable'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const Icon(Icons.cloud_off_outlined),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Prana could not reach the global food database right now.',
+              ),
+            ),
+            TextButton(
+              onPressed: _retryBarcodeLookup,
+              child: const Text('Retry'),
+            ),
           ],
         ),
       ),
@@ -461,6 +668,14 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           ? () => _editCustomFood(food)
           : null,
     );
+  }
+
+  static String _formatNumber(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+
+    return value.toStringAsFixed(1);
   }
 }
 
@@ -635,28 +850,39 @@ class _SearchError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minimumHeight = constraints.maxHeight > 64
+            ? constraints.maxHeight - 64
+            : 0.0;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minimumHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(message, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try again'),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try again'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -666,30 +892,41 @@ class _NoResults extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.search_off,
-              size: 48,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minimumHeight = constraints.maxHeight > 64
+            ? constraints.maxHeight - 64
+            : 0.0;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minimumHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.search_off,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No foods found',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Try another search or create a custom food.',
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            Text(
-              'No foods found',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Try another search or create a custom food.',
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

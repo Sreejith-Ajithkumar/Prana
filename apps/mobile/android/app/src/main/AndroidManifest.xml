@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Network access for global food-provider lookups. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Barcode scanning: camera access is used only while the scanner is open. -->
     <uses-permission android:name="android.permission.CAMERA" />
 
