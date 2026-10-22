@@ -63,7 +63,7 @@ void main() {
     expect(find.text('Global cereal'), findsOneWidget);
     expect(find.text('Example Brand'), findsOneWidget);
     expect(find.text('Data: Open Food Facts'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Use food'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Review'), findsOneWidget);
   });
 
   testWidgets('shows a friendly not-found state', (tester) async {
