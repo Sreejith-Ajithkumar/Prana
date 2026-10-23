@@ -13,9 +13,9 @@ import '../../domain/repositories/food_preferences_repository.dart';
 import '../../domain/repositories/food_repository.dart';
 import '../../domain/services/food_discovery_service.dart';
 import 'barcode_food_confirmation_screen.dart';
+import 'global_food_search_screen.dart';
 import 'barcode_scanner_screen.dart';
 import 'custom_food_screen.dart';
-
 
 typedef BarcodeScanAction =
     Future<ProductBarcode?> Function(BuildContext context);
@@ -180,21 +180,29 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     Navigator.of(context).pop(food);
   }
 
-Future<void> _reviewBarcodeFood(CatalogFood food) async {
-  final confirmedFood = await Navigator.of(context).push<CatalogFood>(
-    MaterialPageRoute(
-      builder: (context) {
-        return BarcodeFoodConfirmationScreen(food: food);
-      },
-    ),
-  );
+  Future<void> _reviewBarcodeFood(CatalogFood food) async {
+    final confirmedFood = await Navigator.of(context).push<CatalogFood>(
+      MaterialPageRoute(
+        builder: (context) {
+          return BarcodeFoodConfirmationScreen(food: food);
+        },
+      ),
+    );
 
-  if (!mounted || confirmedFood == null) {
-    return;
+    if (!mounted || confirmedFood == null) {
+      return;
+    }
+
+    _selectFood(confirmedFood);
   }
 
-  _selectFood(confirmedFood);
-}
+  Future<void> _searchWorldwide() async {
+    final food = await Navigator.of(context).push<CatalogFood>(
+      MaterialPageRoute(builder: (context) => const GlobalFoodSearchScreen()),
+    );
+    if (!mounted || food == null) return;
+    _selectFood(food);
+  }
 
   Future<void> _scanBarcode() async {
     final scanAction =
@@ -396,6 +404,11 @@ Future<void> _reviewBarcodeFood(CatalogFood food) async {
                         label: const Text('Scan barcode'),
                       ),
                       OutlinedButton.icon(
+                        onPressed: _searchWorldwide,
+                        icon: const Icon(Icons.public),
+                        label: const Text('Search worldwide'),
+                      ),
+                      OutlinedButton.icon(
                         onPressed: _createCustomFood,
                         icon: const Icon(Icons.add),
                         label: const Text('Custom'),
@@ -499,8 +512,8 @@ Future<void> _reviewBarcodeFood(CatalogFood food) async {
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
                   onPressed: () => _reviewBarcodeFood(food),
-  icon: const Icon(Icons.fact_check_outlined),
-  label: const Text('Review'),
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Review'),
                 ),
               ),
             ],
