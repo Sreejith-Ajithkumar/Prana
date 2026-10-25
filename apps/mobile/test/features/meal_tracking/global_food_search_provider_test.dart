@@ -85,9 +85,18 @@ void main() {
     final provider = OpenFoodFactsGlobalSearchProvider(
       client: MockClient((_) async => Response('busy', 503)),
     );
+
     expect(
       () => provider.search('cereal'),
-      throwsA(isA<GlobalFoodSearchException>()),
+      throwsA(
+        isA<GlobalFoodSearchException>()
+            .having(
+              (error) => error.reason,
+              'reason',
+              GlobalFoodSearchFailureReason.temporarilyUnavailable,
+            )
+            .having((error) => error.statusCode, 'status code', 503),
+      ),
     );
   });
 }
