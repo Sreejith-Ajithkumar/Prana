@@ -1,0 +1,6 @@
+@Prana.Api_HostAddress = http://localhost:5226
+
+GET {{Prana.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

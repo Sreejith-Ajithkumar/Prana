@@ -1,3 +1,12 @@
 /dist/
 /releases/*.apk
 /releases/*.sha256.txt
+# .NET / ASP.NET Core generated files
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+# Local secrets
+**/secrets.json
