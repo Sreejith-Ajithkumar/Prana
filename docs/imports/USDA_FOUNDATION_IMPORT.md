@@ -71,3 +71,25 @@ dotnet run --no-launch-profile -- --import-usda-foundation "$csv"
 Manual import validation and repeat-import verification passed.
 
 Automated importer-specific unit and integration tests remain outstanding. The initial xUnit project currently contains only its template test.
+
+## Automated importer tests
+
+The USDA Foundation Foods importer has five automated xUnit tests using synthetic CSV fixtures and an isolated in-memory SQLite database.
+
+Test coverage includes:
+
+- Dry-run validation without database writes.
+- Correct calorie and macronutrient mapping.
+- Rejection of incomplete and negative nutrient values.
+- Repeat-import duplicate prevention.
+- Conflicting nutrient measurement rejection.
+
+Run from the repository root:
+
+```powershell
+dotnet test tests/Prana.Api.Tests/Prana.Api.Tests.csproj
+```
+
+**Verified baseline:** 5 importer tests passing, 0 failures.
+
+The tests do not connect to the development `PranaFood` SQL Server database. The existing 336 imported foods remain unchanged.
