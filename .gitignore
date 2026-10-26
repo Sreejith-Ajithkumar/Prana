@@ -10,3 +10,6 @@
 
 # Local secrets
 **/secrets.json
+
+# Downloaded nutrition datasets
+/data/imports/
