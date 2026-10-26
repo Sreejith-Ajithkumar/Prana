@@ -28,3 +28,46 @@ Stop the API before building. Run dry-run before writes; back up local database;
 - Implement USDA record updates on subsequent release ingestion.
 - Build read-only API food search and pagination; include attribution in app UI.
 - Review and update existing `docs/DATABASE.md`, `docs/API.md`, and `docs/architecture/ARCHITECTURE.md` without clobbering existing content.
+
+
+## Verified import results — October 25, 2026
+
+Dataset: USDA FoodData Central Foundation Foods, April 30, 2026 CSV release.
+
+- Foundation Food records: 469
+- Records with required nutrient fields present: 346
+- Records accepted by importer validation: 336
+- Invalid nutrient rows encountered: 10
+- Foods imported into SQL Server: 336
+- Standard 100 g servings created: 336
+- Duplicate source records: 0
+- Foods without servings: 0
+- Invalid servings: 0
+- Second import: 0 new foods, 336 existing foods skipped
+
+The 10 invalid nutrient rows do not necessarily represent 10 rejected foods.
+
+### Verified PowerShell commands
+
+```powershell
+cd "D:\Development\Projects\Prana\apps\api\Prana.Api"
+
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:DOTNET_ENVIRONMENT = "Development"
+
+$csv = "D:\Development\Projects\Prana\data\imports\usda\foundation\FoodData_Central_foundation_food_csv_2026-04-30"
+
+dotnet run --no-launch-profile -- --import-usda-foundation "$csv" --dry-run
+```
+
+After validating the dry-run and backing up the database:
+
+```powershell
+dotnet run --no-launch-profile -- --import-usda-foundation "$csv"
+```
+
+### Testing status
+
+Manual import validation and repeat-import verification passed.
+
+Automated importer-specific unit and integration tests remain outstanding. The initial xUnit project currently contains only its template test.
